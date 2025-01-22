@@ -1,7 +1,8 @@
 use std::f32::consts::PI;
-use std::fs;
+use std::io;
 use std::io::Write;
 use rand::Rng;
+use std::time::{Duration, Instant};
 
 use image::{RgbaImage, Rgba};
 use image::GenericImageView;
@@ -89,6 +90,7 @@ fn penalty(x0: i64, y0: i64, x1: i64, y1: i64, arr: &Vec<Vec<i16>>, weight: &Vec
 
 fn main() 
 {
+    println!("Preparing Image...");
     let mut input_img = image::open("res/".to_string() + PATH).unwrap();
 
     let width = input_img.width() as f32;
@@ -155,12 +157,14 @@ fn main()
         }
     }
 
-
-
     let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
     let mut pin = pins[0];
 
-    for _ in 0..LOOPS
+
+
+    let start_time = Instant::now();
+
+    for i in 0..LOOPS
     {
         let mut pin_nums = Vec::new();
         for i in 0..amount
@@ -191,7 +195,34 @@ fn main()
         draw_line_2(&mut output_img, pin.0 as i64, pin.1 as i64, current_pin.0 as i64, current_pin.1 as i64, &mut pixel_value, &mut weight);
         pin_num = num;
         pin = current_pin;
-    }
 
+
+        let progress = i as f32 / LOOPS as f32;
+        let elapsed = start_time.elapsed();
+        let remaining = if progress > 0.0
+        {
+            Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)//elapsed.as_secs_f32() / progress - elapsed.as_secs_f32();
+        }
+        else
+        {
+            Duration::ZERO
+        };
+
+        let elapsed_minutes = elapsed.as_secs() / 60;
+        let elapsed_seconds = elapsed.as_secs() % 60;
+        let remaining_minutes = remaining.as_secs() / 60;
+        let remaining_seconds = remaining.as_secs() % 60;
+
+        print!(
+            "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
+            progress * 100.0,
+            elapsed_minutes, elapsed_seconds,
+            remaining_minutes, remaining_seconds
+        );
+        io::stdout().flush().unwrap();
+    }
+    print!("\nOne Moment...");
     output_img.save("res/result.png").unwrap();
+    io::stdout().flush().unwrap();
+    println!("\rDone         ");
 }
