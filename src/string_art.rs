@@ -87,8 +87,7 @@ fn penalty(x0: i64, y0: i64, x1: i64, y1: i64, arr: &Vec<Vec<i16>>, weight: &Vec
     (sum_brightness - (REMOVE as i32 * num_pixels)) / num_pixels
 }
 
-
-fn main() 
+pub fn run() 
 {
     println!("Preparing Image...");
     let mut input_img = image::open("res/".to_string() + PATH).unwrap();
