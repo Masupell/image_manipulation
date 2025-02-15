@@ -166,16 +166,7 @@ pub fn run()
 
     for i in 0..LOOPS
     {
-        let mut pin_nums = Vec::new();
-        for _ in 0..amount-1
-        {
-            let mut temp_pin_num = rand::thread_rng().gen_range(0..pins.len());
-            while temp_pin_num == pin_num || pin_nums.contains(&temp_pin_num)
-            {
-                temp_pin_num = rand::thread_rng().gen_range(0..pins.len());
-            }
-            pin_nums.push(temp_pin_num);
-        }
+        let pin_nums: Vec<usize> = (0..amount).filter(|&pin| pin != pin_num).collect();
 
         let mut darkest = i32::MAX;
         let mut num = 0;
@@ -202,7 +193,7 @@ pub fn run()
             let elapsed = start_time.elapsed();
             let remaining = if progress > 0.0
             {
-                Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)//elapsed.as_secs_f32() / progress - elapsed.as_secs_f32();
+                Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)
             }
             else
             {
