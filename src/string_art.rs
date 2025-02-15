@@ -162,13 +162,13 @@ pub fn run()
 
 
     let start_time = Instant::now();
+    let mut last_update = Instant::now();
 
     for i in 0..LOOPS
     {
         let mut pin_nums = Vec::new();
-        for i in 0..amount
+        for _ in 0..amount-1
         {
-            if i == pins.len()-1 { continue; }
             let mut temp_pin_num = rand::thread_rng().gen_range(0..pins.len());
             while temp_pin_num == pin_num || pin_nums.contains(&temp_pin_num)
             {
@@ -196,29 +196,34 @@ pub fn run()
         pin = current_pin;
 
 
-        let progress = i as f32 / LOOPS as f32;
-        let elapsed = start_time.elapsed();
-        let remaining = if progress > 0.0
+        if last_update.elapsed().as_secs() >= 1
         {
-            Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)//elapsed.as_secs_f32() / progress - elapsed.as_secs_f32();
+            let progress = i as f32 / LOOPS as f32;
+            let elapsed = start_time.elapsed();
+            let remaining = if progress > 0.0
+            {
+                Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)//elapsed.as_secs_f32() / progress - elapsed.as_secs_f32();
+            }
+            else
+            {
+                Duration::ZERO
+            };
+    
+            let elapsed_minutes = elapsed.as_secs() / 60;
+            let elapsed_seconds = elapsed.as_secs() % 60;
+            let remaining_minutes = remaining.as_secs() / 60;
+            let remaining_seconds = remaining.as_secs() % 60;
+    
+            print!(
+                "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
+                progress * 100.0,
+                elapsed_minutes, elapsed_seconds,
+                remaining_minutes, remaining_seconds
+            );
+            io::stdout().flush().unwrap();
+
+            last_update = Instant::now();
         }
-        else
-        {
-            Duration::ZERO
-        };
-
-        let elapsed_minutes = elapsed.as_secs() / 60;
-        let elapsed_seconds = elapsed.as_secs() % 60;
-        let remaining_minutes = remaining.as_secs() / 60;
-        let remaining_seconds = remaining.as_secs() % 60;
-
-        print!(
-            "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
-            progress * 100.0,
-            elapsed_minutes, elapsed_seconds,
-            remaining_minutes, remaining_seconds
-        );
-        io::stdout().flush().unwrap();
     }
     print!("\nOne Moment...");
     output_img.save("res/result.png").unwrap();
