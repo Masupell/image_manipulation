@@ -7,6 +7,8 @@ use std::time::{Duration, Instant};
 use image::{RgbaImage, Rgba};
 use image::GenericImageView;
 
+use rayon::prelude::*;
+
 pub static LOOPS: i32 = 6000;
 pub static DRAW_OPACITY: u8 = 130;
 pub static REMOVE: i16 = 50;
@@ -89,6 +91,7 @@ fn penalty(x0: i64, y0: i64, x1: i64, y1: i64, arr: &Vec<Vec<i16>>, weight: &Vec
 
 pub fn run() 
 {
+    let beginning = Instant::now();
     println!("Preparing Image...");
     let mut input_img = image::open("res/".to_string() + PATH).unwrap();
 
@@ -103,10 +106,17 @@ pub fn run()
     input_img = input_img.crop_imm(0, 0, img_size, img_size);
 
     let mut pixel_value: Vec<Vec<i16>> = vec![vec![0; input_img.width() as usize]; input_img.height() as usize];
-    for (x, y, pixel) in input_img.pixels()
+    // for (x, y, pixel) in input_img.pixels()
+    // {
+    //     pixel_value[y as usize][x as usize] = pixel.0[0] as i16;
+    // }
+    pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading
     {
-        pixel_value[y as usize][x as usize] = pixel.0[0] as i16;
-    }
+        row.par_iter_mut().enumerate().for_each(|(x, val)| 
+        {
+            *val = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
+        });
+    });
 
     let mut weight: Vec<Vec<f32>> = vec![vec![0.0; input_img.width() as usize]; input_img.height() as usize];
     for (x, y, pixel) in input_img.pixels()
@@ -130,19 +140,6 @@ pub fn run()
 
         pins.push((x, y));
     }
-
-    let mut pin_nums = Vec::new();
-    let pin_num = rand::thread_rng().gen_range(0..pins.len());
-    for i in 0..100
-    {
-        if i == pins.len()-1 { continue; }
-        let mut temp_pin_num = rand::thread_rng().gen_range(0..pins.len());
-        while temp_pin_num == pin_num || pin_nums.contains(&temp_pin_num)
-        {
-            temp_pin_num = rand::thread_rng().gen_range(0..pins.len());
-        }
-        pin_nums.push(temp_pin_num);
-    }
     
     let amount = pins.len();
 
@@ -155,6 +152,10 @@ pub fn run()
             output_img.put_pixel(x, y, Rgba([200, 200, 200, 255]));
         }
     }
+    // output_img.enumerate_pixels_mut().par_bridge().for_each(|(_, _, pixel)| 
+    // {
+    //     *pixel = Rgba([200, 200, 200, 255]);
+    // });
 
     let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
     let mut pin = pins[0];
@@ -220,4 +221,5 @@ pub fn run()
     output_img.save("res/result.png").unwrap();
     io::stdout().flush().unwrap();
     println!("\rDone         ");
+    println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
 }
