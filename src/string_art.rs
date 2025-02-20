@@ -4,14 +4,14 @@ use std::io::Write;
 use rand::Rng;
 use std::time::{Duration, Instant};
 
-use image::{RgbaImage, Rgba};
+use image::{GenericImage, Rgb, Rgba, RgbaImage};
 use image::GenericImageView;
 
 use rayon::prelude::*;
 
-pub static LOOPS: i32 = 6000;
-pub static DRAW_OPACITY: u8 = 130;
-pub static REMOVE: i16 = 50;
+pub static LOOPS: i32 = 6000; //6000
+pub static DRAW_OPACITY: u8 = 130; //130
+pub static REMOVE: i16 = 130; //50
 
 pub const PATH: &str = "peppe_sad.png";
 
@@ -102,6 +102,15 @@ pub fn run()
     let img_size = radius as u32 * 2;
 
     input_img = input_img.grayscale();
+    // for y in 0..input_img.height()
+    // {
+    //     for x in 0..input_img.width()
+    //     {
+    //         let color = input_img.get_pixel(x, y);
+    //         input_img.put_pixel(x, y, Rgba([0, color.0[1], 0, 255]));
+    //     }
+    // }
+    input_img.save("res/test.png").unwrap();
 
     input_img = input_img.crop_imm(0, 0, img_size, img_size);
 
@@ -172,7 +181,7 @@ pub fn run()
         let mut darkest = i32::MAX;
         let mut num = 0;
         for i in 0..pin_nums.len()
-        {   
+        {
             let current_pin = pins[pin_nums[i]];
             let brightness = penalty(pin.0 as i64, pin.1 as i64, current_pin.0 as i64, current_pin.1 as i64, &pixel_value, &weight);
             if brightness < darkest
