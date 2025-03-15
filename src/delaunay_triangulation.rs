@@ -9,6 +9,9 @@ pub fn run(img_path: &str)
     blurred.save("tests/blurred.png").unwrap();
 }
 
+
+// I would have had to put it on the gpu later anyways
+
 // fn gaussian_blur(img: &DynamicImage, sigma: f32) -> DynamicImage
 // {
 //     let kernel_size: u32 = 3;
