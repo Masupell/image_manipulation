@@ -93,7 +93,7 @@ pub fn run()
 {
     let beginning = Instant::now();
     println!("Preparing Image...");
-    let mut input_img = image::open("res/".to_string() + PATH).unwrap();
+    let mut input_img = image::open("tests/".to_string() + PATH).unwrap();
 
     let width = input_img.width() as f32;
     let height = input_img.height() as f32;
