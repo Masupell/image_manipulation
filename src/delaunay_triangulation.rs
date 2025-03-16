@@ -9,6 +9,33 @@ pub fn run(img_path: &str)
     blurred.save("tests/blurred.png").unwrap();
 }
 
+fn sobel()
+{
+    let gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+    let gy = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+
+
+}
+
+fn convolution(gx_y: [[i32; 3]; 3], test: [[i32; 3]; 3])
+{
+    let mut sum = 0;
+    for y in 0..test.len()
+    {
+        for x in 0..test[y].len()
+        {
+            let temp = gx_y[3 - 1 - y][3 - 1 - x] * test[y][x];
+            print!("{} ", gx_y[3 - 1 - y][3 - 1 - x]);
+            sum += temp;
+        }
+        println!();
+    }
+    println!();
+    println!("{:?}", test);
+    println!();
+    println!("{}", sum); 
+}
+
 
 // I would have had to put it on the gpu later anyways
 
@@ -120,14 +147,18 @@ pub fn run(img_path: &str)
 
 
 
-// #[cfg(test)]
-// mod tests 
-// {
-//     use super::*;
+#[cfg(test)]
+mod tests 
+{
+    use super::*;
 
-//     #[test]
-//     fn it_works() 
-//     {
-//         run("tests/koala.webp");
-//     }// cargo test -- --nocapture
-// }
+    #[test]
+    fn it_works() 
+    {
+        let gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+        let gy = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+
+        convolution(gx, gy);
+        // run("tests/koala.webp");
+    }// cargo test -- --nocapture
+}
