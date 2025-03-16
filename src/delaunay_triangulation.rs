@@ -149,6 +149,8 @@ fn sobel(img: &mut DynamicImage)
     }
 }
 
+// fn map_to_direction(degrees)
+
 fn convolution(gx_y: [[i32; 3]; 3], test: [[u8; 3]; 3]) -> i32
 {
     let mut sum = 0;
@@ -281,6 +283,6 @@ mod tests
     #[test]
     fn it_works() 
     {
-        run("tests/swan.jpg");
+        run("example/peppe_sad.png");
     }// cargo test -- --nocapture
 }
