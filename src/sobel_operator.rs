@@ -173,7 +173,7 @@ pub fn sobel_cpu()
 }
 pub fn sobel_gpu()
 {
-    let input_img = image::open("tests/swan.jpg").unwrap();
+    let input_img = image::open("tests/peppe_sad.png").unwrap();
     let blurred = input_img.blur(5.0);
     // let gray = blurred.grayscale();
 

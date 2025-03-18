@@ -66,10 +66,10 @@ fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32>
     }
     
     // Gradient magnitude
-    let edge_strength = sqrt(gx_sum * gx_sum + gy_sum * gy_sum);
+    let edge_strength = gx_sum * gx_sum + gy_sum * gy_sum; // Actually needs square toot for gradient magnitude, but just use the cube in threshold instead
     
     // Normalize (assuming a max expected value)
-    let threshold: f32 = 0.1;
+    let threshold: f32 = 0.01;
     let edge = select(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), edge_strength > threshold);
     
     return edge;
