@@ -155,18 +155,32 @@ mod tests
 
         // gray.save("tests/result.png").unwrap();
 
-        pollster::block_on(sobel_on_gpu());
+        // pollster::block_on(sobel_on_gpu());
+        sobel_gpu();
     }
+}
+
+pub fn sobel_cpu()
+{
+    let input_img = image::open("tests/swan.jpg").unwrap();
+
+    let blurred = input_img.blur(5.0);
+    let mut gray = blurred.grayscale();
+    sobel(&mut gray);
+    gray.save("/tests/result.png").unwrap();
+}
+pub fn sobel_gpu()
+{
+    let input_img = image::open("tests/swan.jpg").unwrap();
+    let blurred = input_img.blur(5.0);
+    let mut gray = blurred.grayscale();
+
+    pollster::block_on(sobel_on_gpu("tests/swan.jpg"));
 }
 
 
 
-
-
-
-
-
-pub async fn sobel_on_gpu()
+async fn sobel_on_gpu(path: &str) 
 {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor 
     {
@@ -191,8 +205,111 @@ pub async fn sobel_on_gpu()
     },
     None,).await.unwrap();
 
+    // Input Texture
+    /////////////////////////////////////////////////////////////////////////////
+    let input_img = image::open(path).unwrap();
+    let (img_width, img_height) = input_img.dimensions();
+
+    let img_size = wgpu::Extent3d
+    {
+        width: img_width,
+        height: img_height,
+        depth_or_array_layers: 1,
+    };
+
+    let input_texture_desc = wgpu::TextureDescriptor
+    {
+        label: None,
+        size: img_size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[]
+    };
+
+    let input_texture = device.create_texture(&input_texture_desc);
+    let input_texture_view = input_texture.create_view(&Default::default());
+
+    queue.write_texture(wgpu::TexelCopyTextureInfo
+    {
+        texture: &input_texture,
+        mip_level: 0,
+        origin: wgpu::Origin3d::ZERO,
+        aspect: wgpu::TextureAspect::All,
+    },
+    input_img.to_rgba8().as_raw(),
+    wgpu::TexelCopyBufferLayout
+    {
+        offset: 0,
+        bytes_per_row: Some(4 * img_width),
+        rows_per_image: Some(img_height),
+    },
+    img_size,);
+
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor
+    {
+        label: None,
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+
+    let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor
+    {
+        label: None,
+        entries: 
+        &[
+            wgpu::BindGroupLayoutEntry
+            {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture 
+                {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry
+            {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            }
+        ]
+    });
+
+    let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor
+    {
+        label: None,
+        layout: &texture_bind_group_layout,
+        entries:
+        &[
+            wgpu::BindGroupEntry
+            {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&input_texture_view)
+            },
+            wgpu::BindGroupEntry
+            {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&sampler)
+            }
+        ]
+    });
+    /////////////////////////////////////////////////////////////////////////////
+
+
     let texture_size = 512u32;
-    let texture_desc = wgpu::TextureDescriptor 
+    let output_texture_desc = wgpu::TextureDescriptor 
     {
         size: wgpu::Extent3d 
         {
@@ -208,8 +325,8 @@ pub async fn sobel_on_gpu()
         label: None,
         view_formats: &[],
     };
-    let texture = device.create_texture(&texture_desc);
-    let texture_view = texture.create_view(&Default::default());
+    let output_texture = device.create_texture(&output_texture_desc);
+    let output_texture_view = output_texture.create_view(&Default::default());
 
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor 
     {
@@ -229,7 +346,7 @@ pub async fn sobel_on_gpu()
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor 
     {
         label: Some("Render Pipeline Layout"),
-        bind_group_layouts: &[],
+        bind_group_layouts: &[&texture_bind_group_layout],
         push_constant_ranges: &[],
     });
 
@@ -250,7 +367,7 @@ pub async fn sobel_on_gpu()
             entry_point: Some("fs_main"),
             targets: &[Some(wgpu::ColorTargetState 
             {
-                format: texture_desc.format,
+                format: output_texture_desc.format,
                 blend: Some(wgpu::BlendState 
                 {
                     alpha: wgpu::BlendComponent::REPLACE,
@@ -288,11 +405,11 @@ pub async fn sobel_on_gpu()
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment 
             {
-                view: &texture_view,
+                view: &output_texture_view,
                 resolve_target: None,
                 ops: wgpu::Operations 
                 {
-                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.0, b: 1.0, a: 1.0 }),
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -301,6 +418,7 @@ pub async fn sobel_on_gpu()
             timestamp_writes: None,
         });
         render_pass.set_pipeline(&render_pipeline);
+        render_pass.set_bind_group(0, &texture_bind_group, &[]);
         render_pass.draw(0..3, 0..1);
     }
 
@@ -308,7 +426,7 @@ pub async fn sobel_on_gpu()
         wgpu::TexelCopyTextureInfo
         {
             aspect: wgpu::TextureAspect::All,
-            texture: &texture,
+            texture: &output_texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
         },
@@ -318,11 +436,11 @@ pub async fn sobel_on_gpu()
             layout: wgpu::TexelCopyBufferLayout 
             {
                 offset: 0,
-                bytes_per_row: Some(4 * texture_size),
+                bytes_per_row: Some(texture_size * 4),
                 rows_per_image: Some(texture_size),
             },
         },
-        texture_desc.size,
+        output_texture_desc.size,
     );
 
     queue.submit(Some(encoder.finish()));
@@ -335,6 +453,6 @@ pub async fn sobel_on_gpu()
 
     let data = buffer_slice.get_mapped_range();
     use image::{ImageBuffer, Rgba};
-    ImageBuffer::<Rgba<u8>, _>::from_raw(texture_size, texture_size, data).unwrap().save("tests/sobel_gpu_result.png").unwrap();
+    ImageBuffer::<Rgba<u8>, _>::from_raw(texture_size, texture_size, data).unwrap().save("tests/sobel_gpu.png").unwrap();
     output_buffer.unmap();
 }
