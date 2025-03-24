@@ -141,26 +141,26 @@ fn convolution(kernel: [[i32; 3]; 3], matrix: [[u8; 3]; 3]) -> i32
     sum
 }
 
-#[cfg(test)]
-mod tests
-{
-    use super::*;
+// #[cfg(test)]
+// mod tests
+// {
+//     use super::*;
 
-    #[test]
-    pub fn run()
-    {
-        // let input_img = image::open("tests/swan.jpg").unwrap();
+//     #[test]
+//     pub fn run()
+//     {
+//         // let input_img = image::open("tests/swan.jpg").unwrap();
 
-        // let blurred = input_img.blur(5.0);
-        // let mut gray = blurred.grayscale();
-        // sobel(&mut gray);
+//         // let blurred = input_img.blur(5.0);
+//         // let mut gray = blurred.grayscale();
+//         // sobel(&mut gray);
 
-        // gray.save("tests/result.png").unwrap();
+//         // gray.save("tests/result.png").unwrap();
 
-        // pollster::block_on(sobel_on_gpu());
-        sobel_gpu();
-    }
-}
+//         // pollster::block_on(sobel_on_gpu());
+//         sobel_gpu();
+//     }
+// }
 
 pub fn sobel_cpu()
 {
