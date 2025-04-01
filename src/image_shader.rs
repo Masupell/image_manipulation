@@ -131,15 +131,15 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
     /////////////////////////////////////////////////////////////////////////////
     
     let padded_size = align_to_multiple(img_width.max(img_height), 64);
+    let padded_width = align_to_multiple(img_width, 64);
+    let padded_height = align_to_multiple(img_height, 64);
 
-
-    let texture_size = 640u32;
     let output_texture_desc = wgpu::TextureDescriptor 
     {
         size: wgpu::Extent3d 
         {
-            width: padded_size,
-            height: padded_size,
+            width: padded_width,//padded_size,
+            height: padded_height, //padded_size,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
@@ -262,8 +262,8 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
             layout: wgpu::TexelCopyBufferLayout 
             {
                 offset: 0,
-                bytes_per_row: Some(padded_size * 4),
-                rows_per_image: Some(padded_size),
+                bytes_per_row: Some(padded_width * 4),
+                rows_per_image: Some(padded_height),
             },
         },
         output_texture_desc.size,
@@ -279,7 +279,7 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
 
     let data = buffer_slice.get_mapped_range();
     use image::{ImageBuffer, Rgba};
-    ImageBuffer::<Rgba<u8>, _>::from_raw(padded_size, padded_size, data).unwrap().save("tests/sobel_gpu.png").unwrap();
+    ImageBuffer::<Rgba<u8>, _>::from_raw(padded_width, padded_height, data).unwrap().save("tests/sobel_gpu.png").unwrap();
     output_buffer.unmap();
 }
 
