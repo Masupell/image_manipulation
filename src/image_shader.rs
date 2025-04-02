@@ -1,8 +1,8 @@
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImage, GenericImageView};
 
 // let input_img = image::open(path).unwrap();
 // Needs to return image in the end (so far just saves it)
-// Needs to crop image as well (so far is always a square at least as big as input_img)
+// Needs to crop image better (changed to be more fitting, but still to big (padded image))
 // shader_path: Path to .wgsl file (with vs_main and vs_frag)
 pub async fn image_shader(input_img: DynamicImage, shader_path: &str) 
 {
@@ -27,7 +27,7 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
         required_limits: wgpu::Limits::default(),
         memory_hints: wgpu::MemoryHints::default(),
     },
-    None,).await.unwrap();
+    None).await.unwrap();
 
     // Input Texture
     /////////////////////////////////////////////////////////////////////////////
@@ -69,7 +69,7 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
         bytes_per_row: Some(4 * img_width),
         rows_per_image: Some(img_height),
     },
-    img_size,);
+    img_size);
 
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor
     {
