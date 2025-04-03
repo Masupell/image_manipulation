@@ -1,10 +1,9 @@
-use image::{DynamicImage, GenericImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
 
 // let input_img = image::open(path).unwrap();
-// Needs to return image in the end (so far just saves it)
 // Needs to crop image better (changed to be more fitting, but still to big (padded image))
 // shader_path: Path to .wgsl file (with vs_main and vs_frag)
-pub async fn image_shader(input_img: DynamicImage, shader_path: &str) 
+pub async fn image_shader(input_img: DynamicImage, shader_path: &str) -> image::ImageBuffer<Rgba<u8>, Vec<u8>>
 {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor 
     {
@@ -277,13 +276,18 @@ pub async fn image_shader(input_img: DynamicImage, shader_path: &str)
     device.poll(wgpu::Maintain::Wait);
     rx.receive().await.unwrap().unwrap();
 
-    let data = buffer_slice.get_mapped_range();
-    use image::{ImageBuffer, Rgba};
-    ImageBuffer::<Rgba<u8>, _>::from_raw(padded_width, padded_height, data).unwrap().save("tests/sobel_gpu.png").unwrap();
+    let data = 
+    {
+        let mapped_range = buffer_slice.get_mapped_range();
+        let vec = mapped_range.to_vec();
+        vec
+    };
+    let image = ImageBuffer::<Rgba<u8>, _>::from_raw(padded_width, padded_height, data).unwrap();
     output_buffer.unmap();
+    image
 }
 
-fn align_to_multiple(value: u32, alignment: u32) -> u32 
+fn align_to_multiple(value: u32, alignment: u32) -> u32
 {
     (value + alignment - 1) & !(alignment - 1)
 }
