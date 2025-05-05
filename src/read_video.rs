@@ -1,5 +1,5 @@
 use anyhow::Error;
-use ffmpeg_next::{self as ffmpeg, codec::traits::{Decoder, Encoder}, codec, encoder, format, Rational};
+use ffmpeg_next::{self as ffmpeg, codec::{self, traits::{Decoder, Encoder}}, device::input, encoder, format, Rational};
 use image::{DynamicImage, GenericImage, GenericImageView};
 
 pub fn read()
@@ -87,10 +87,15 @@ fn yuv420p_to_rgb(y_data: &[u8], u_data: &[u8], v_data: &[u8], width: usize, hei
 
     for y in 0..height 
     {
-        for x in 0..width 
+        for x in 0..width
         {
             let y_index = y * y_stride + x;
             let uv_index = (y / 2) * uv_stride + (x / 2);
+
+            if y == 0 && x == 0
+            {
+                println!("Y_Index: {}\nUV_Index: {}", ((height-1)*y_stride + width-1), ((height-1)/2)*uv_stride + ((width-1)/2));
+            }
 
             let y_value = y_data[y_index] as f32;
             let u_value = u_data[uv_index] as f32 - 128.0;
@@ -100,8 +105,10 @@ fn yuv420p_to_rgb(y_data: &[u8], u_data: &[u8], v_data: &[u8], width: usize, hei
             let g = y_value - 0.344136 * u_value -0.714136 * v_value;
             let b = y_value + 1.772 * u_value;
 
-            // let index = (y * width + x) * 3; // Normal index
-            let index = (height -1 - y + height * x) * 3; // 90 degrees clockwise rotation (because width and height of frame are swapped)
+            let index = (y * width + x) * 3; // Normal index
+            // let index = (height -1 - y + height * x) * 3; // 90 degrees clockwise rotation (because width and height of frame are swapped)
+            // Actually, just learned. it is because portrait videos from phone have metatags or so, that I can not add myself
+            //So unless it is a portrait video from a phone, I should not rotate
             rgb_buffer[index]     = r as u8;
             rgb_buffer[index + 1] = g as u8;
             rgb_buffer[index + 2] = b as u8;
@@ -110,9 +117,184 @@ fn yuv420p_to_rgb(y_data: &[u8], u_data: &[u8], v_data: &[u8], width: usize, hei
     rgb_buffer
 }
 
+fn div_ceil(a: usize, b: usize) -> usize {
+    (a + b - 1) / b
+}
+
+fn rgb_to_yuv420p(rgb_data: &[u8], width: usize, height: usize) -> (Vec<u8>, Vec<u8>, Vec<u8>)
+{
+    let mut y_plane = vec![0u8; width * height];
+    // let mut u_plane = vec![0u8; (width * height) / 4];
+    // let mut v_plane = vec![0u8; (width * height) / 4];
+    let uv_width = div_ceil(width, 2);
+    let uv_height = div_ceil(height, 2);
+    let uv_plane_len = uv_width * uv_height;
+    let mut u_plane = vec![0u8; uv_plane_len];
+    let mut v_plane = vec![0u8; uv_plane_len];
+
+    for y in 0..height
+    {
+        for x in 0..width
+        {
+            let index = (y * width + x) * 3;
+            let r = rgb_data[index] as f32;
+            let g = rgb_data[index + 1] as f32;
+            let b = rgb_data[index + 2] as f32;
+        
+            // let y_value = (0.299_f32 * r + 0.587_f32 * g + 0.114_f32 * b).round();
+            let y_value = (16.0_f32 + 0.257_f32 * r + 0.504_f32 * g + 0.098_f32 * b).round();
+        
+            y_plane[y * width + x] = y_value.clamp(0.0, 255.0) as u8;
+        }
+    }
+
+    for y in (0..height).step_by(2)
+    {
+        for x in (0..width).step_by(2)
+        {
+            let mut sum_u = 0.0;
+            let mut sum_v = 0.0;
+
+            let mut count = 0.0;
+
+            for dy in 0..2
+            {
+                for dx in 0..2
+                {
+                    let px = x + dx;
+                    let pz = y + dy;
+
+                    if px < width && pz < height
+                    {
+                        let index = (pz * width + px) * 3;
+
+                        let r = rgb_data[index] as f32;
+                        let g = rgb_data[index + 1] as f32;
+                        let b = rgb_data[index + 2] as f32;
+    
+                        // let u = -0.169 * r - 0.331 * g + 0.5 * b + 128.0;
+                        // let v = 0.5 * r - 0.419 * g - 0.081 * b + 128.0;
+                        let u = -0.148 * r - 0.291 * g + 0.439 * b + 128.0;
+                        let v =  0.439 * r - 0.368 * g - 0.071 * b + 128.0;
+                        sum_u += u;
+                        sum_v += v;
+
+                        count += 1.0;
+                    }
+                }
+            }
+
+            let avg_u = (sum_u / count).round().clamp(0.0, 255.0) as u8;
+            let avg_v = (sum_v / count).round().clamp(0.0, 255.0) as u8;
+
+            let uv_index = (y / 2) * (width / 2) + (x / 2);
+            u_plane[uv_index] = avg_u;
+            v_plane[uv_index] = avg_v;
+        }
+    }
+
+    (y_plane,u_plane,v_plane)
+}
 
 
+pub fn test()
+{
+    let input_img = image::open("tests/koala.webp").unwrap();
+    let test_to_yu420p = rgb_to_yuv420p(input_img.to_rgb8().as_raw(), input_img.width() as usize, input_img.height() as usize);
+    println!("Size of: \nY: {}\nU: {}\nV: {}", test_to_yu420p.0.len(), test_to_yu420p.1.len(), test_to_yu420p.2.len());
+    let test_to_rgb = yuv420p_to_rgb(&test_to_yu420p.0, &test_to_yu420p.1, &test_to_yu420p.2, input_img.width() as usize, input_img.height() as usize, input_img.width() as usize, input_img.width() as usize / 2);
+    let output_img = image::RgbImage::from_raw(input_img.width(), input_img.height(), test_to_rgb).unwrap();
 
+    let grayimage = image::GrayImage::from_vec(input_img.width(), input_img.height(), test_to_yu420p.0).unwrap();
+
+    grayimage.save("tests/koala_y.png").unwrap();
+
+    let width = input_img.width() as usize;
+    let height = input_img.height() as usize;
+    let mut full_res_plane = vec![0u8; width * height];
+
+    for y in 0..height
+    {
+        for x in 0..width
+        {
+            let uv_x = x /2;
+            let uv_y = y/2;
+            let uv_index = (uv_y * (width / 2)) + uv_x;
+            full_res_plane[y * width + x] = test_to_yu420p.1[uv_index];
+        }
+    }
+
+    let grayimage_u = image::GrayImage::from_vec(width as u32, height as u32, full_res_plane).unwrap();
+    grayimage_u.save("tests/koala_u.png").unwrap();
+
+    let mut full_res_plane = vec![0u8; width * height];
+
+    for y in 0..height
+    {
+        for x in 0..width
+        {
+            let uv_x = x /2;
+            let uv_y = y/2;
+            let uv_index = (uv_y * (width / 2)) + uv_x;
+            full_res_plane[y * width + x] = test_to_yu420p.2[uv_index];
+        }
+    }
+
+    let grayimage_v = image::GrayImage::from_vec(width as u32, height as u32, full_res_plane).unwrap();
+    grayimage_v.save("tests/koala_v.png").unwrap();
+
+    output_img.save("tests/koala2.png").unwrap();
+
+
+    // ffmpeg::init().unwrap();
+
+    // let path = "tests/Lucy_Video.mp4";
+
+    // match ffmpeg::format::input(&path)
+    // {
+    //     Ok(mut input) => 
+    //     {
+    //         let video_stream_index = input.streams().best(ffmpeg::media::Type::Video).map(|s| s.index()).ok_or_else(|| anyhow::anyhow!("No Video-Stream found")).unwrap();
+
+    //         let mut decoder = open_codec_context(&input.stream(video_stream_index).unwrap()).unwrap();
+
+    //         let width = decoder.width();
+    //         let height = decoder.height();
+
+    //         let mut temp = 0;
+
+    //         for (stream_index, packet) in input.packets()
+    //         {
+    //             if stream_index.index() == video_stream_index 
+    //             {
+    //                 if decoder.send_packet(&packet).is_ok() 
+    //                 {
+    //                     let mut frame = ffmpeg::frame::Video::empty();
+
+    //                     while decoder.receive_frame(&mut frame).is_ok()
+    //                     {
+    //                         if temp == 0
+    //                         {
+    //                             let y_data = frame.data(0);
+    //                             let u_data = frame.data(1);
+    //                             let v_data = frame.data(2);
+                                
+    //                             let rgb = yuv420p_to_rgb(y_data, u_data, v_data, width as usize, height as usize, frame.stride(0), frame.stride(1));
+    //                             println!("y_stride: {}, uv_stride: {}", frame.stride(0), frame.stride(1));
+    //                             println!("y_data: {}, u_data: {}, v_data: {}", y_data.len(), u_data.len(), v_data.len());
+    //                             let img = image::RgbImage::from_raw(frame.height(), frame.width(), rgb).unwrap();
+    //                             img.save("tests/rgb_function_test.png").unwrap();
+    //                         }
+
+    //                         temp += 1;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     },
+    //     Err(e) => println!("Failed to open Video: {}", e),
+    // }
+}
 
 
 
