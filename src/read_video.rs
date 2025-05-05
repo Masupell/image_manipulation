@@ -331,10 +331,6 @@ fn align_to_multiple(value: u32, alignment: u32) -> u32
     (value + alignment - 1) & !(alignment - 1)
 }
 
-
-
-
-
 pub fn read_video()
 {
     println!("Reading video...");
@@ -353,6 +349,22 @@ pub fn read_video()
             let video_stream_index = input.streams().best(ffmpeg::media::Type::Video).map(|s| s.index()).ok_or_else(|| anyhow::anyhow!("No Video-Stream found")).unwrap();
 
             let mut decoder = open_codec_context(&input.stream(video_stream_index).unwrap()).unwrap();
+
+            // let metadata = input.stream(video_stream_index).unwrap().metadata().to_owned();
+            // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
+            // for (key, value) in metadata.iter() {
+            //     println!("{}: {}", key, value);
+            // }
+            // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
+
+            let sidedata: Vec<Vec<u8>> = input.stream(video_stream_index).unwrap().side_data().map(|data| data.data().to_vec()).collect();
+
+            // for data in sidedata.iter()
+            // {
+            //     // println!("Side Data: type: {:?}, size: {}", data.kind(), data.data().len());
+            //     println!("{:?}", data)
+            // }
+            println!("////////////////////////////////////////////////////////////////////////////////////////////////");
 
             let width = decoder.width();
             let height = decoder.height();
@@ -413,6 +425,8 @@ pub fn read_video()
             encoder_context.set_frame_rate(Some(frame_rate));
 
             stream.set_parameters(&encoder_context);
+            // stream.set_metadata(metadata);
+
 
             output.write_header().unwrap();
 
