@@ -1,6 +1,5 @@
 use anyhow::Error;
-use ffmpeg_next::{self as ffmpeg, codec::traits::Decoder};
-use ffmpeg::{codec, format, decoder};
+use ffmpeg_next::{self as ffmpeg, codec::traits::{Decoder, Encoder}, codec, encoder, format, Rational};
 use image::{DynamicImage, GenericImage, GenericImageView};
 
 pub fn read()
@@ -338,9 +337,14 @@ fn align_to_multiple(value: u32, alignment: u32) -> u32
 
 pub fn read_video()
 {
+    println!("Reading video...");
+    
     ffmpeg::init().unwrap();
 
     let path = "tests/Lucy_Video.mp4";
+    let mut test_vector = Vec::new();
+
+    // let (mut width, mut height) = (0, 0);
 
     match ffmpeg::format::input(&path)
     {
@@ -353,9 +357,11 @@ pub fn read_video()
             let width = decoder.width();
             let height = decoder.height();
 
+            let (time_base, frame_rate) = (input.stream(video_stream_index).unwrap().time_base(), input.stream(video_stream_index).unwrap().rate());
+
             let (device, queue, texture_bind_group, input_texture, output_texture, output_texture_view, output_texture_desc, output_buffer, render_pipeline, img_size, padded_width, padded_height) = pollster::block_on(shader_setup(width as u32, height as u32, "src/shader/sobel_operator.wgsl"));
 
-            let mut test_vector = Vec::new();
+            let mut temp = 0;
 
             for (stream_index, packet) in input.packets()
             {
@@ -367,24 +373,114 @@ pub fn read_video()
 
                         while decoder.receive_frame(&mut frame).is_ok()
                         {
+                            temp += 1;
+                            
                             let y_data = frame.data(0);
                             let u_data = frame.data(1);
                             let v_data = frame.data(2);
                             
-                            let buf = yuv420p_to_rgb(y_data, u_data, v_data, frame.width() as usize, frame.height() as usize, frame.stride(0), frame.stride(1));
-                            let img = image::RgbImage::from_raw(frame.height(), frame.width(), buf).unwrap(); // frame.hwight and width are inverted
-                            let input_img = image::DynamicImage::ImageRgb8(img);
+                            // let buf = yuv420p_to_rgb(y_data, u_data, v_data, frame.width() as usize, frame.height() as usize, frame.stride(0), frame.stride(1));
+                            // let img = image::RgbImage::from_raw(frame.height(), frame.width(), buf).unwrap(); // frame.hwight and width are inverted
+                            // let input_img = image::DynamicImage::ImageRgb8(img);
                             
-                            let (width, height, data) = pollster::block_on(send_frame(&device, &queue, &input_texture, &output_texture, &output_texture_view, &output_texture_desc, &render_pipeline, &output_buffer, padded_width, padded_height, &texture_bind_group, img_size, width, height, input_img));
-                            test_vector.push((width, height, data));
+                            // let img = pollster::block_on(crate::image_shader::image_shader(input_img, "src/shader/sobel_operator.wgsl"));
+                            // test.save("image_test.png").unwrap();
+
+                            // let (width, height, data) = pollster::block_on(send_frame(&device, &queue, &input_texture, &output_texture, &output_texture_view, &output_texture_desc, &render_pipeline, &output_buffer, padded_width, padded_height, &texture_bind_group, img_size, width, height, input_img));
+                            test_vector.push(frame.clone());
+                            
                         }
                     }
                 }
             }
+
+
+
+            let mut output = ffmpeg::format::output("tests/video_result.mp4").unwrap();
+
+            let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
+
+            let mut stream = output.add_stream(codec).unwrap();
+
+            let stream_index = stream.index();
+
+            let mut encoder_context = ffmpeg::codec::context::Context::new_with_codec(codec).encoder().video().unwrap();
+
+            encoder_context.set_width(width);
+            encoder_context.set_height(height);
+            encoder_context.set_format(ffmpeg::format::Pixel::YUV420P);
+            encoder_context.set_time_base(time_base);
+            encoder_context.set_frame_rate(Some(frame_rate));
+
+            stream.set_parameters(&encoder_context);
+
+            output.write_header().unwrap();
+
+            let mut encoder = encoder_context.open().unwrap();
+
+            for frame in test_vector.iter()
+            {
+                encoder.send_frame(frame).unwrap();     
+
+                let mut packet = ffmpeg::packet::Packet::empty();
+                while encoder.receive_packet(&mut packet).is_ok()
+                {
+                    if unsafe { packet.is_empty() }
+                    {
+                        continue;
+                    }
+
+                    packet.set_stream(stream_index);
+                    packet.rescale_ts(encoder.time_base(), time_base);
+                    packet.write_interleaved(&mut output).unwrap();
+                }
+            }
+
+            encoder.send_eof().unwrap();
+
+            let mut packet = ffmpeg::packet::Packet::empty();
+            while encoder.receive_packet(&mut packet).is_ok()
+            {
+                if unsafe { packet.is_empty() }
+                {
+                    continue;
+                }
+
+                packet.set_stream(stream_index);
+                packet.rescale_ts(encoder.time_base(), time_base);
+                packet.write_interleaved(&mut output).unwrap();
+            }
+
+            output.write_trailer().unwrap();
+
         },
         Err(e) => println!("Failed to open Video: {}", e),
     }
+
+
+    // let mut output = ffmpeg::format::output("tests/video_result.mp4").unwrap(); 
+    // let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
+
+    // let mut stream = output.add_stream(codec).unwrap();
+
+    // let ctx_ptr = unsafe { ffmpeg::ffi::avcodec_alloc_context3(codec.as_ptr()) };
+    // let context = unsafe { codec::context::Context::wrap(ctx_ptr, Some(std::rc::Rc::new(0))) };
+    // let mut encoder = context.encoder().video().unwrap();
+
+    // encoder.set_width(width);
+    // encoder.set_height(height);
+    // encoder.set_frame_rate(Some(ffmpeg::rational::Rational::new(30, 1)));  // 30 FPS
+    // encoder.set_time_base(ffmpeg::rational::Rational::new(1, 30));  // Time base for 30 FPS
+    // encoder.set_bit_rate(2_000_000);  // Set bitrate (2 Mbps)
+    // encoder.set_format(ffmpeg::util::format::Pixel::YUV420P);
+
+    // encoder.send_frame(frame)
+    // let mut packet = ffmpeg::packet::Packet::empty();
+    
 }
+
+
+
 
 
 
