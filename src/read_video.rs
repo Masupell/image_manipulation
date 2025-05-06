@@ -519,7 +519,7 @@ pub fn read_video()
     
     ffmpeg::init().unwrap();
 
-    let path = "tests/Lucy_Video.mp4";
+    let path = "tests/Drone.mp4";
     let mut test_vector = Vec::new();
 
     // let (mut width, mut height) = (0, 0);
@@ -539,7 +539,7 @@ pub fn read_video()
             // }
             // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
 
-            let sidedata: Vec<Vec<u8>> = input.stream(video_stream_index).unwrap().side_data().map(|data| data.data().to_vec()).collect();
+            // let sidedata: Vec<Vec<u8>> = input.stream(video_stream_index).unwrap().side_data().map(|data| data.data().to_vec()).collect();
 
             // for data in sidedata.iter()
             // {
@@ -552,8 +552,8 @@ pub fn read_video()
             let height = decoder.height();
 
             let (time_base, frame_rate) = (input.stream(video_stream_index).unwrap().time_base(), input.stream(video_stream_index).unwrap().rate());
-
-            let (device, queue, texture_bind_group, input_texture, output_texture, output_texture_view, output_texture_desc, output_buffer, render_pipeline, img_size, padded_width, padded_height) = pollster::block_on(shader_setup(width as u32, height as u32, "src/shader/sobel_operator.wgsl"));
+            println!("{}\n{}", time_base.denominator(), frame_rate.numerator());
+            // let (device, queue, texture_bind_group, input_texture, output_texture, output_texture_view, output_texture_desc, output_buffer, render_pipeline, img_size, padded_width, padded_height) = pollster::block_on(shader_setup(width as u32, height as u32, "src/shader/sobel_operator.wgsl"));
 
             let mut temp = 0;
 
@@ -567,11 +567,15 @@ pub fn read_video()
 
                         while decoder.receive_frame(&mut frame).is_ok()
                         {
+                            // let pts = temp * time_base.denominator() as i64 / frame_rate.numerator() as i64;
+                            // frame.set_pts(Some(pts));
+                            
                             temp += 1;
                             
                             let y_data = frame.data(0);
                             let u_data = frame.data(1);
                             let v_data = frame.data(2);
+
                             
                             // let buf = yuv420p_to_rgb(y_data, u_data, v_data, frame.width() as usize, frame.height() as usize, frame.stride(0), frame.stride(1));
                             // let img = image::RgbImage::from_raw(frame.height(), frame.width(), buf).unwrap(); // frame.hwight and width are inverted
@@ -587,6 +591,7 @@ pub fn read_video()
                     }
                 }
             }
+            println!("Amount input frames: {}", temp);
 
 
 
@@ -614,9 +619,20 @@ pub fn read_video()
 
             let mut encoder = encoder_context.open().unwrap();
 
-            for frame in test_vector.iter()
+            encoder.set_max_b_frames(0);
+            encoder.set_gop(1);
+
+            let pts_step = time_base.denominator() / frame_rate.numerator(); // Should maybe be float?
+
+            println!("Amount of Frames: {}", test_vector.len());
+
+            // println!("clone  -  Frame");
+            for (i, frame) in test_vector.iter().enumerate()
             {
-                encoder.send_frame(frame).unwrap();     
+                let mut cloned = frame.clone();
+                cloned.set_pts(Some(i as i64 * pts_step as i64));
+                // println!("{:?}  -  {:?}", cloned.pts(), frame.pts());
+                encoder.send_frame(&cloned).unwrap();
 
                 let mut packet = ffmpeg::packet::Packet::empty();
                 while encoder.receive_packet(&mut packet).is_ok()
@@ -625,7 +641,7 @@ pub fn read_video()
                     {
                         continue;
                     }
-
+                    
                     packet.set_stream(stream_index);
                     packet.rescale_ts(encoder.time_base(), time_base);
                     packet.write_interleaved(&mut output).unwrap();
@@ -635,6 +651,7 @@ pub fn read_video()
             encoder.send_eof().unwrap();
 
             let mut packet = ffmpeg::packet::Packet::empty();
+            let mut received = 0;
             while encoder.receive_packet(&mut packet).is_ok()
             {
                 if unsafe { packet.is_empty() }
@@ -645,33 +662,16 @@ pub fn read_video()
                 packet.set_stream(stream_index);
                 packet.rescale_ts(encoder.time_base(), time_base);
                 packet.write_interleaved(&mut output).unwrap();
+                received += 1;
+                println!("Packet {} received", received);
             }
+            println!("Recieved Frames: {}", received);
 
             output.write_trailer().unwrap();
 
         },
         Err(e) => println!("Failed to open Video: {}", e),
     }
-
-
-    // let mut output = ffmpeg::format::output("tests/video_result.mp4").unwrap(); 
-    // let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
-
-    // let mut stream = output.add_stream(codec).unwrap();
-
-    // let ctx_ptr = unsafe { ffmpeg::ffi::avcodec_alloc_context3(codec.as_ptr()) };
-    // let context = unsafe { codec::context::Context::wrap(ctx_ptr, Some(std::rc::Rc::new(0))) };
-    // let mut encoder = context.encoder().video().unwrap();
-
-    // encoder.set_width(width);
-    // encoder.set_height(height);
-    // encoder.set_frame_rate(Some(ffmpeg::rational::Rational::new(30, 1)));  // 30 FPS
-    // encoder.set_time_base(ffmpeg::rational::Rational::new(1, 30));  // Time base for 30 FPS
-    // encoder.set_bit_rate(2_000_000);  // Set bitrate (2 Mbps)
-    // encoder.set_format(ffmpeg::util::format::Pixel::YUV420P);
-
-    // encoder.send_frame(frame)
-    // let mut packet = ffmpeg::packet::Packet::empty();
     
 }
 
