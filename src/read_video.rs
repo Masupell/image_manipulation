@@ -1,6 +1,7 @@
 use anyhow::Error;
 use ffmpeg_next::{self as ffmpeg, codec::{self, traits::{Decoder, Encoder}}, device::input, encoder, format, Rational};
 use image::{DynamicImage, GenericImage, GenericImageView};
+use crate::ffmpeg_transcoder::video;
 
 pub fn read()
 {
@@ -514,164 +515,274 @@ fn align_to_multiple(value: u32, alignment: u32) -> u32
 }
 
 pub fn read_video()
-{
-    println!("Reading video...");
-    
-    ffmpeg::init().unwrap();
+{    
+    video("tests/Drone.mp4", "tests/Drone_result.mp4");
 
-    let path = "tests/Drone.mp4";
-    let mut test_vector = Vec::new();
+
+//     ffmpeg::init().unwrap();
+
+//     let path = "tests/Drone.mp4";
+//     // let mut test_vector = Vec::new();
+
+
+//     let mut input = ffmpeg::format::input(path).unwrap();
+//     let mut output = ffmpeg::format::output("tests/Drone_result.mp4").unwrap();
+
+//     let video_stream_index = input.streams().best(ffmpeg::media::Type::Video).map(|s| s.index()).ok_or_else(|| anyhow::anyhow!("No Video-Stream found")).unwrap();
+//     let input_time_base = input.stream(video_stream_index).unwrap().time_base();
+
+//     let mut decoder = ffmpeg::codec::context::Context::from_parameters(input.stream(video_stream_index).unwrap().parameters()).unwrap().decoder().video().unwrap();
+
+//     let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
+
+//     let global_header = output.format().flags().contains(format::Flags::GLOBAL_HEADER);
+//     let mut output_stream = output.add_stream(codec).unwrap();
+
+//     let mut encoder = ffmpeg::codec::context::Context::new_with_codec(codec).encoder().video().unwrap();
+
+//     output_stream.set_parameters(&encoder);
+//     encoder.set_height(decoder.height());
+//     encoder.set_width(decoder.width());
+//     encoder.set_aspect_ratio(decoder.aspect_ratio());
+//     encoder.set_format(decoder.format());
+//     encoder.set_frame_rate(decoder.frame_rate());
+//     encoder.set_time_base(input.stream(video_stream_index).unwrap().time_base());
+
+//     if global_header
+//     {
+//         encoder.set_flags(codec::Flags::GLOBAL_HEADER);
+//     }
+
+//     let mut opened_encoder = encoder.open().unwrap();
+//     output_stream.set_parameters(&opened_encoder);
+//     output_stream.set_time_base(opened_encoder.time_base());
+
+
+//     output.set_metadata(input.metadata().to_owned());
+
+//     println!("Input time base: {:?}", input_time_base);
+// println!("Encoder time base: {:?}", opened_encoder.time_base());
+
+//     output.write_header().unwrap();
+
+//     let mut frames = 0;
+
+//     for (stream, packet) in input.packets() 
+//     {
+//         if stream.index() == video_stream_index
+//         {
+//             decoder.send_packet(&packet).unwrap();
+
+//             let mut frame = ffmpeg::frame::Video::empty();
+
+//             while decoder.receive_frame(&mut frame).is_ok()
+//             {
+//                 frames += 1;
+//                 let time_stamp = frame.timestamp();
+//                 frame.set_pts(time_stamp);
+//                 frame.set_kind(ffmpeg::picture::Type::None);
+//                 opened_encoder.send_frame(&frame).unwrap();
+
+//                 let mut received_packet = ffmpeg::Packet::empty();
+//                 while opened_encoder.receive_packet(&mut received_packet).is_ok()
+//                 {
+//                     received_packet.set_stream(0);
+//                     received_packet.rescale_ts(input_time_base, opened_encoder.time_base());
+//                     received_packet.write_interleaved(&mut output).unwrap();
+//                 }
+//             }
+//         }
+//     }
+//     println!("Send Frames: {}", frames);
+//     frames = 0;
+
+//     //Flush
+//     decoder.send_eof().unwrap();
+//     let mut frame = ffmpeg::frame::Video::empty();
+//     while decoder.receive_frame(&mut frame).is_ok()
+//     {
+//         frames += 1;
+//         let time_stamp = frame.timestamp();
+//         frame.set_pts(time_stamp);
+//         frame.set_kind(ffmpeg::picture::Type::None);
+//         opened_encoder.send_frame(&frame).unwrap();
+
+//         let mut received_packet = ffmpeg::Packet::empty();
+//         while opened_encoder.receive_packet(&mut received_packet).is_ok()
+//         {
+//             received_packet.set_stream(0);
+//             received_packet.rescale_ts(input_time_base, opened_encoder.time_base());
+//             received_packet.write_interleaved(&mut output).unwrap();
+//         }
+//     }
+//     println!("Received Frames: {}", frames);
+//     opened_encoder.send_eof().unwrap();
+
+//     let mut received_packet = ffmpeg::Packet::empty();
+//     while opened_encoder.receive_packet(&mut received_packet).is_ok()
+//     {
+//         received_packet.set_stream(0);
+//         received_packet.rescale_ts(input_time_base, opened_encoder.time_base());
+//         received_packet.write_interleaved(&mut output).unwrap();
+//     }
+//     output.write_trailer().unwrap();
+
+
+
+
+
+
 
     // let (mut width, mut height) = (0, 0);
 
-    match ffmpeg::format::input(&path)
-    {
-        Ok(mut input) => 
-        {
-            let video_stream_index = input.streams().best(ffmpeg::media::Type::Video).map(|s| s.index()).ok_or_else(|| anyhow::anyhow!("No Video-Stream found")).unwrap();
+    // match ffmpeg::format::input(&path)
+    // {
+    //     Ok(mut input) => 
+    //     {
+    //         let video_stream_index = input.streams().best(ffmpeg::media::Type::Video).map(|s| s.index()).ok_or_else(|| anyhow::anyhow!("No Video-Stream found")).unwrap();
 
-            let mut decoder = open_codec_context(&input.stream(video_stream_index).unwrap()).unwrap();
+    //         let mut decoder = open_codec_context(&input.stream(video_stream_index).unwrap()).unwrap();
 
-            // let metadata = input.stream(video_stream_index).unwrap().metadata().to_owned();
-            // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
-            // for (key, value) in metadata.iter() {
-            //     println!("{}: {}", key, value);
-            // }
-            // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
+    //         // let metadata = input.stream(video_stream_index).unwrap().metadata().to_owned();
+    //         // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
+    //         // for (key, value) in metadata.iter() {
+    //         //     println!("{}: {}", key, value);
+    //         // }
+    //         // println!("////////////////////////////////////////////////////////////////////////////////////////////////");
 
-            // let sidedata: Vec<Vec<u8>> = input.stream(video_stream_index).unwrap().side_data().map(|data| data.data().to_vec()).collect();
+    //         // let sidedata: Vec<Vec<u8>> = input.stream(video_stream_index).unwrap().side_data().map(|data| data.data().to_vec()).collect();
 
-            // for data in sidedata.iter()
-            // {
-            //     // println!("Side Data: type: {:?}, size: {}", data.kind(), data.data().len());
-            //     println!("{:?}", data)
-            // }
-            println!("////////////////////////////////////////////////////////////////////////////////////////////////");
+    //         // for data in sidedata.iter()
+    //         // {
+    //         //     // println!("Side Data: type: {:?}, size: {}", data.kind(), data.data().len());
+    //         //     println!("{:?}", data)
+    //         // }
+    //         println!("////////////////////////////////////////////////////////////////////////////////////////////////");
 
-            let width = decoder.width();
-            let height = decoder.height();
+    //         let width = decoder.width();
+    //         let height = decoder.height();
 
-            let (time_base, frame_rate) = (input.stream(video_stream_index).unwrap().time_base(), input.stream(video_stream_index).unwrap().rate());
-            println!("{}\n{}", time_base.denominator(), frame_rate.numerator());
-            // let (device, queue, texture_bind_group, input_texture, output_texture, output_texture_view, output_texture_desc, output_buffer, render_pipeline, img_size, padded_width, padded_height) = pollster::block_on(shader_setup(width as u32, height as u32, "src/shader/sobel_operator.wgsl"));
+    //         let (time_base, frame_rate) = (input.stream(video_stream_index).unwrap().time_base(), input.stream(video_stream_index).unwrap().rate());
+    //         println!("{}\n{}", time_base.denominator(), frame_rate.numerator());
+    //         // let (device, queue, texture_bind_group, input_texture, output_texture, output_texture_view, output_texture_desc, output_buffer, render_pipeline, img_size, padded_width, padded_height) = pollster::block_on(shader_setup(width as u32, height as u32, "src/shader/sobel_operator.wgsl"));
 
-            let mut temp = 0;
+    //         let mut temp = 0;
 
-            for (stream_index, packet) in input.packets()
-            {
-                if stream_index.index() == video_stream_index 
-                {
-                    if decoder.send_packet(&packet).is_ok() 
-                    {
-                        let mut frame = ffmpeg::frame::Video::empty();
+    //         for (stream_index, packet) in input.packets()
+    //         {
+    //             if stream_index.index() == video_stream_index 
+    //             {
+    //                 if decoder.send_packet(&packet).is_ok() 
+    //                 {
+    //                     let mut frame = ffmpeg::frame::Video::empty();
 
-                        while decoder.receive_frame(&mut frame).is_ok()
-                        {
-                            // let pts = temp * time_base.denominator() as i64 / frame_rate.numerator() as i64;
-                            // frame.set_pts(Some(pts));
+    //                     while decoder.receive_frame(&mut frame).is_ok()
+    //                     {
+    //                         // let pts = temp * time_base.denominator() as i64 / frame_rate.numerator() as i64;
+    //                         // frame.set_pts(Some(pts));
                             
-                            temp += 1;
+    //                         temp += 1;
                             
-                            let y_data = frame.data(0);
-                            let u_data = frame.data(1);
-                            let v_data = frame.data(2);
+    //                         let y_data = frame.data(0);
+    //                         let u_data = frame.data(1);
+    //                         let v_data = frame.data(2);
 
                             
-                            // let buf = yuv420p_to_rgb(y_data, u_data, v_data, frame.width() as usize, frame.height() as usize, frame.stride(0), frame.stride(1));
-                            // let img = image::RgbImage::from_raw(frame.height(), frame.width(), buf).unwrap(); // frame.hwight and width are inverted
-                            // let input_img = image::DynamicImage::ImageRgb8(img);
+    //                         // let buf = yuv420p_to_rgb(y_data, u_data, v_data, frame.width() as usize, frame.height() as usize, frame.stride(0), frame.stride(1));
+    //                         // let img = image::RgbImage::from_raw(frame.height(), frame.width(), buf).unwrap(); // frame.hwight and width are inverted
+    //                         // let input_img = image::DynamicImage::ImageRgb8(img);
                             
-                            // let img = pollster::block_on(crate::image_shader::image_shader(input_img, "src/shader/sobel_operator.wgsl"));
-                            // test.save("image_test.png").unwrap();
+    //                         // let img = pollster::block_on(crate::image_shader::image_shader(input_img, "src/shader/sobel_operator.wgsl"));
+    //                         // test.save("image_test.png").unwrap();
 
-                            // let (width, height, data) = pollster::block_on(send_frame(&device, &queue, &input_texture, &output_texture, &output_texture_view, &output_texture_desc, &render_pipeline, &output_buffer, padded_width, padded_height, &texture_bind_group, img_size, width, height, input_img));
-                            test_vector.push(frame.clone());
+    //                         // let (width, height, data) = pollster::block_on(send_frame(&device, &queue, &input_texture, &output_texture, &output_texture_view, &output_texture_desc, &render_pipeline, &output_buffer, padded_width, padded_height, &texture_bind_group, img_size, width, height, input_img));
+    //                         test_vector.push(frame.clone());
                             
-                        }
-                    }
-                }
-            }
-            println!("Amount input frames: {}", temp);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         println!("Amount input frames: {}", temp);
 
 
 
-            let mut output = ffmpeg::format::output("tests/video_result.mp4").unwrap();
+    //         let mut output = ffmpeg::format::output("tests/video_result.mp4").unwrap();
 
-            let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
+    //         let codec = ffmpeg::codec::encoder::find(codec::Id::H264).unwrap();
 
-            let mut stream = output.add_stream(codec).unwrap();
+    //         let mut stream = output.add_stream(codec).unwrap();
 
-            let stream_index = stream.index();
+    //         let stream_index = stream.index();
 
-            let mut encoder_context = ffmpeg::codec::context::Context::new_with_codec(codec).encoder().video().unwrap();
+    //         let mut encoder_context = ffmpeg::codec::context::Context::new_with_codec(codec).encoder().video().unwrap();
 
-            encoder_context.set_width(width);
-            encoder_context.set_height(height);
-            encoder_context.set_format(ffmpeg::format::Pixel::YUV420P);
-            encoder_context.set_time_base(time_base);
-            encoder_context.set_frame_rate(Some(frame_rate));
+    //         encoder_context.set_width(width);
+    //         encoder_context.set_height(height);
+    //         encoder_context.set_format(ffmpeg::format::Pixel::YUV420P);
+    //         encoder_context.set_time_base(time_base);
+    //         encoder_context.set_frame_rate(Some(frame_rate));
 
-            stream.set_parameters(&encoder_context);
-            // stream.set_metadata(metadata);
+    //         stream.set_parameters(&encoder_context);
+    //         // stream.set_metadata(metadata);
 
 
-            output.write_header().unwrap();
+    //         output.write_header().unwrap();
 
-            let mut encoder = encoder_context.open().unwrap();
+    //         let mut encoder = encoder_context.open().unwrap();
 
-            encoder.set_max_b_frames(0);
-            encoder.set_gop(1);
+    //         encoder.set_max_b_frames(0);
+    //         encoder.set_gop(1);
 
-            let pts_step = time_base.denominator() / frame_rate.numerator(); // Should maybe be float?
+    //         let pts_step = time_base.denominator() / frame_rate.numerator(); // Should maybe be float?
 
-            println!("Amount of Frames: {}", test_vector.len());
+    //         println!("Amount of Frames: {}", test_vector.len());
 
-            // println!("clone  -  Frame");
-            for (i, frame) in test_vector.iter().enumerate()
-            {
-                let mut cloned = frame.clone();
-                cloned.set_pts(Some(i as i64 * pts_step as i64));
-                // println!("{:?}  -  {:?}", cloned.pts(), frame.pts());
-                encoder.send_frame(&cloned).unwrap();
+    //         // println!("clone  -  Frame");
+    //         for (i, frame) in test_vector.iter().enumerate()
+    //         {
+    //             let mut cloned = frame.clone();
+    //             cloned.set_pts(Some(i as i64 * pts_step as i64));
+    //             // println!("{:?}  -  {:?}", cloned.pts(), frame.pts());
+    //             encoder.send_frame(&cloned).unwrap();
 
-                let mut packet = ffmpeg::packet::Packet::empty();
-                while encoder.receive_packet(&mut packet).is_ok()
-                {
-                    if unsafe { packet.is_empty() }
-                    {
-                        continue;
-                    }
+    //             let mut packet = ffmpeg::packet::Packet::empty();
+    //             while encoder.receive_packet(&mut packet).is_ok()
+    //             {
+    //                 if unsafe { packet.is_empty() }
+    //                 {
+    //                     continue;
+    //                 }
                     
-                    packet.set_stream(stream_index);
-                    packet.rescale_ts(encoder.time_base(), time_base);
-                    packet.write_interleaved(&mut output).unwrap();
-                }
-            }
+    //                 packet.set_stream(stream_index);
+    //                 packet.rescale_ts(encoder.time_base(), time_base);
+    //                 packet.write_interleaved(&mut output).unwrap();
+    //             }
+    //         }
 
-            encoder.send_eof().unwrap();
+    //         encoder.send_eof().unwrap();
 
-            let mut packet = ffmpeg::packet::Packet::empty();
-            let mut received = 0;
-            while encoder.receive_packet(&mut packet).is_ok()
-            {
-                if unsafe { packet.is_empty() }
-                {
-                    continue;
-                }
+    //         let mut packet = ffmpeg::packet::Packet::empty();
+    //         let mut received = 0;
+    //         while encoder.receive_packet(&mut packet).is_ok()
+    //         {
+    //             if unsafe { packet.is_empty() }
+    //             {
+    //                 continue;
+    //             }
 
-                packet.set_stream(stream_index);
-                packet.rescale_ts(encoder.time_base(), time_base);
-                packet.write_interleaved(&mut output).unwrap();
-                received += 1;
-                println!("Packet {} received", received);
-            }
-            println!("Recieved Frames: {}", received);
+    //             packet.set_stream(stream_index);
+    //             packet.rescale_ts(encoder.time_base(), time_base);
+    //             packet.write_interleaved(&mut output).unwrap();
+    //             received += 1;
+    //             println!("Packet {} received", received);
+    //         }
+    //         println!("Recieved Frames: {}", received);
 
-            output.write_trailer().unwrap();
+    //         output.write_trailer().unwrap();
 
-        },
-        Err(e) => println!("Failed to open Video: {}", e),
-    }
+    //     },
+    //     Err(e) => println!("Failed to open Video: {}", e),
+    // }
     
 }
 

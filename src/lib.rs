@@ -6,3 +6,4 @@ pub mod sobel_operator;
 pub mod image_shader;
 pub mod read_video;
 pub mod test;
+pub mod ffmpeg_transcoder;
