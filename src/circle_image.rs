@@ -115,7 +115,7 @@ pub fn image_complex(name: &str, output_path: &str, mut min_radius: i32)
     generate_complex(100000, circles, grid_size, size, input, output_path, min_radius);
 }
 
-fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, output_path: &str, min_radius: i32)
+pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, output_path: &str, min_radius: i32)
 {
     let mut rng = thread_rng();
     let mut output = RgbaImage::new(size.0 as u32, size.1 as u32);
@@ -127,6 +127,7 @@ fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>
     circles[(x/size.0*grid_size) as usize][(y/size.1*grid_size) as usize].push(((x, y), r));
 
     let start_time = Instant::now();
+    let mut last_update = Instant::now();
 
     for count in 0..iterations
     {
@@ -191,32 +192,37 @@ fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>
             }
         }
 
-        let progress = count as f32 / iterations as f32;
-        let elapsed = start_time.elapsed();
-        let remaining = if progress > 0.0
+        if last_update.elapsed().as_secs() >= 1
         {
-            Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)//elapsed.as_secs_f32() / progress - elapsed.as_secs_f32();
+            let progress = count as f32 / iterations as f32;// i
+            let elapsed = start_time.elapsed();
+            let remaining = if progress > 0.0
+            {
+                Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)
+            }
+            else
+            {
+                Duration::ZERO
+            };
+    
+            let elapsed_minutes = elapsed.as_secs() / 60;
+            let elapsed_seconds = elapsed.as_secs() % 60;
+            let remaining_minutes = remaining.as_secs() / 60;
+            let remaining_seconds = remaining.as_secs() % 60;
+    
+            print!(
+                "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
+                progress * 100.0,
+                elapsed_minutes, elapsed_seconds,
+                remaining_minutes, remaining_seconds
+            );
+            io::stdout().flush().unwrap();
+
+            last_update = Instant::now();
         }
-        else
-        {
-            Duration::ZERO
-        };
-
-        let elapsed_minutes = elapsed.as_secs() / 60;
-        let elapsed_seconds = elapsed.as_secs() % 60;
-        let remaining_minutes = remaining.as_secs() / 60;  //Something is weird here
-        let remaining_seconds = remaining.as_secs() % 60;
-
-        print!(
-            "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
-            progress * 100.0,
-            elapsed_minutes, elapsed_seconds,
-            remaining_minutes, remaining_seconds
-        );
-        io::stdout().flush().unwrap();
     }
 
-    _ = output.save(format!("{}/result.png", output_path));
+    output.save(format!("{}/result.png", output_path)).unwrap();
 }
 
 
