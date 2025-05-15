@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 use std::io::{self, Write};
+use ffmpeg_next::format;
 use image::{DynamicImage, GenericImageView, RgbaImage};
 use rand::prelude::*;
 
@@ -112,10 +113,10 @@ pub fn image_complex(name: &str, output_path: &str, mut min_radius: i32)
         ]
     */
 
-    generate_complex(100000, circles, grid_size, size, input, output_path, min_radius);
+    generate_complex(100000, circles, grid_size, size, input, min_radius).save(format!("{}/result.png", output_path)).unwrap();
 }
 
-pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, output_path: &str, min_radius: i32)
+pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, min_radius: i32) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>>
 {
     let mut rng = thread_rng();
     let mut output = RgbaImage::new(size.0 as u32, size.1 as u32);
@@ -222,7 +223,7 @@ pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i
         }
     }
 
-    output.save(format!("{}/result.png", output_path)).unwrap();
+    output
 }
 
 
