@@ -85,10 +85,10 @@ fn further(c: char) -> bool
 }
 
 
-pub fn image_complex(name: &str, output_path: &str, mut min_radius: i32)
+pub fn image_complex(name: &str, output_path: &str, mut max_radius: i32)
 {
     let name = name;
-    if min_radius < 10 { min_radius = 10;}
+    if max_radius < 10 { max_radius = 10;}
 
     let input = image::open(name);
     if input.is_err()
@@ -99,7 +99,7 @@ pub fn image_complex(name: &str, output_path: &str, mut min_radius: i32)
     let input = input.unwrap();
     let size = (input.width() as i32, input.height() as i32);
 
-    let grid_size = size.0.min(size.1)/min_radius/2;
+    let grid_size = size.0.min(size.1)/max_radius/2;
 
     let circles: Vec<Vec<Vec<((i32, i32), i32)>>> = vec![vec![vec![]; 10]; 10];
     /*
@@ -113,7 +113,7 @@ pub fn image_complex(name: &str, output_path: &str, mut min_radius: i32)
         ]
     */
 
-    generate_complex(100000, circles, grid_size, size, input, min_radius).save(format!("{}/result.png", output_path)).unwrap();
+    generate_complex(100000, circles, grid_size, size, input, max_radius).save(format!("{}/result.png", output_path)).unwrap();
 }
 
 pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, min_radius: i32) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>>
