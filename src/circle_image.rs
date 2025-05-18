@@ -116,7 +116,7 @@ pub fn image_complex(name: &str, output_path: &str, mut max_radius: i32)
     generate_complex(100000, circles, grid_size, size, input, max_radius).save(format!("{}/result.png", output_path)).unwrap();
 }
 
-pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, min_radius: i32) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>>
+pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i32)>>>, grid_size: i32, size: (i32, i32), input: DynamicImage, max_radius: i32) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>>
 {
     let mut rng = thread_rng();
     let mut output = RgbaImage::new(size.0 as u32, size.1 as u32);
@@ -134,7 +134,7 @@ pub fn generate_complex(iterations: i32, mut circles: Vec<Vec<Vec<((i32, i32), i
     {
         let x = rng.gen_range(0..size.0);
         let y = rng.gen_range(0..size.1);
-        let mut radius = min_radius;
+        let mut radius = max_radius;
 
         let i = 1.max(x/size.0*grid_size).min(grid_size-2);
         let j = 1.max(y/size.1*grid_size).min(grid_size-2);
