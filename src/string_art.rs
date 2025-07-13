@@ -4,7 +4,7 @@ use std::io::Write;
 use rand::Rng;
 use std::time::{Duration, Instant};
 
-use image::{GenericImage, Rgb, Rgba, RgbaImage};
+use image::{GenericImage, Pixel, Rgb, Rgba, RgbaImage};
 use image::GenericImageView;
 
 use rayon::prelude::*;
@@ -15,44 +15,69 @@ pub static REMOVE: i16 = 130; //50
 
 pub const PATH: &str = "peppe_sad.png";
 
-fn draw_line_2(img: &mut RgbaImage, x0: i64, y0: i64, x1: i64, y1: i64, arr: &mut Vec<Vec<i16>>, weight: &mut Vec<Vec<f32>>)// -> Vec<Vec<u8>>//Draws white
-{
-    // Create local variables for moving start point
-    let mut x0 = x0;
-    let mut y0 = y0;
+fn draw_line_2(img: &mut RgbaImage, x0: i64, y0: i64, x1: i64, y1: i64, arr: &mut Vec<Vec<i16>>, _weight: &mut Vec<Vec<f32>>) {
+    let x0 = x0 as f32;
+    let y0 = y0 as f32;
+    let x1 = x1 as f32;
+    let y1 = y1 as f32;
 
-    // Get absolute x/y offset
-    let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
-    let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
+    let steep = (y1 - y0).abs() > (x1 - x0).abs();
 
-    // Get slopes
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-
-    // Initialize error
-    let mut err = if dx > dy { dx } else {-dy} / 2;
-    let mut err2;
-
-    loop 
+    let (x0, y0, x1, y1) = if steep 
     {
-        // Set pixel
-        // let color = [(((255 - DRAW_OPACITY as i32 as i32) * 255 + DRAW_OPACITY as i32 * 0) / 255) as u8, (((255 - DRAW_OPACITY as i32) * 255 + DRAW_OPACITY as i32 * 0) / 255) as u8, (((255 - DRAW_OPACITY as i32) * 255 + DRAW_OPACITY as i32 * 0) / 255) as u8, 255 as u8];
-        img.get_pixel_mut(x0 as u32, y0 as u32).0 = [0, 0, 0, DRAW_OPACITY]; //DRAW_OPACITY
-        arr[y0 as usize][x0 as usize] += REMOVE;
-        // weight[y0 as usize][x0 as usize] -= REMOVE as f32/255.0;
+        (y0, x0, y1, x1)
+    } 
+    else 
+    {
+        (x0, y0, x1, y1)
+    };
 
+    let (x0, y0, x1, y1) = if x0 > x1 
+    {
+        (x1, y1, x0, y0)
+    } 
+    else 
+    {
+        (x0, y0, x1, y1)
+    };
 
-        // Check end condition
-        if x0 == x1 && y0 == y1 { break };
+    let dx = x1 - x0;
+    let dy = y1 - y0;
+    let gradient = if dx == 0.0 { 1.0 } else { dy / dx };
 
-        // Store old error
-        err2 = 2 * err;
+    let mut x = x0.round();
+    let mut y = y0 + (x - x0) * gradient;
 
-        // Adjust error and start position
-        if err2 > -dx { err -= dy; x0 += sx; }
-        if err2 < dy { err += dx; y0 += sy; }
+    while x <= x1 
+    {
+        let base_x = x as i32;
+        let base_y = y.floor() as i32;
+        let weight = y.fract();
+
+        let mut draw = |ix: i32, iy: i32, alpha: f32| 
+        {
+            if ix >= 0 && iy >= 0 && (ix as u32) < img.width() && (iy as u32) < img.height() 
+            {
+                let color = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
+                img.get_pixel_mut(ix as u32, iy as u32).blend(&color);
+                arr[iy as usize][ix as usize] += (REMOVE as f32 * alpha) as i16;
+            }
+        };
+
+        if steep 
+        {
+            draw(base_y, base_x, 1.0 - weight);
+            draw(base_y + 1, base_x, weight);
+        } 
+        else 
+        {
+            draw(base_x, base_y, 1.0 - weight);
+            draw(base_x, base_y + 1, weight);
+        }
+
+        x += 1.0;
+        y += gradient;
     }
-
 }
 
 fn penalty(x0: i64, y0: i64, x1: i64, y1: i64, arr: &Vec<Vec<i16>>, weight: &Vec<Vec<f32>>) -> i32
@@ -110,7 +135,7 @@ pub fn run()
     //         input_img.put_pixel(x, y, Rgba([0, color.0[1], 0, 255]));
     //     }
     // }
-    input_img.save("res/test.png").unwrap();
+    // input_img.save("res/test.png").unwrap();
 
     input_img = input_img.crop_imm(0, 0, img_size, img_size);
 
@@ -227,7 +252,7 @@ pub fn run()
         }
     }
     print!("\nOne Moment...");
-    output_img.save("res/result.png").unwrap();
+    output_img.save("tests/result01.png").unwrap();
     io::stdout().flush().unwrap();
     println!("\rDone         ");
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
