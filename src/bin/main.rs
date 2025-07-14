@@ -23,7 +23,9 @@ fn main()
             }
             else if test[0] == '2'
             {
-                string_art::run("/home/marcel/Documents/programming/image_manipulation/tests/peppe_sad.png");
+                // string_art::run("/home/marcel/Downloads/pexels-pixabay-47547.jpg");
+                stringart_rgb::run("/home/marcel/Downloads/pexels-pixabay-47547.jpg");
+                // stringart_rgb::run();
                 return;
             }
             else 

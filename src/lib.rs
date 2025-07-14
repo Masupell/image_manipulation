@@ -8,3 +8,4 @@ pub mod read_video;
 pub mod test;
 pub mod ffmpeg_transcoder;
 pub mod mix;
+pub mod stringart_rgb;

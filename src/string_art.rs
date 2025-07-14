@@ -4,7 +4,7 @@ use std::i32;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-use image::{Pixel, Rgba, RgbaImage};
+use image::{Rgba, RgbaImage};
 use image::GenericImageView;
 use rayon::prelude::*;
 
@@ -37,21 +37,6 @@ pub fn run(path: &str)
             let i = (y * img_size + x) as usize;
             pixel_value[i] = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
         }
-    }
-
-    // let mut pixel_value: Vec<Vec<i16>> = vec![vec![0; input_img.width() as usize]; input_img.height() as usize];
-    // pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading, just saving the image pixels to this array
-    // {
-    //     row.par_iter_mut().enumerate().for_each(|(x, val)| 
-    //     {
-    //         *val = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
-    //     });
-    // });
-
-    let mut weight: Vec<Vec<f32>> = vec![vec![0.0; input_img.width() as usize]; input_img.height() as usize];
-    for (x, y, pixel) in input_img.pixels()
-    {
-        weight[y as usize][x as usize] = (1.0 - ((pixel.0[0] as f32)/255.0)).abs();
     }
 
     let mut error_sum: i32 = pixel_value.iter().map(|&v| v as i32).sum();
@@ -106,8 +91,10 @@ pub fn run(path: &str)
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
+    let brightness_threshold = 10.0;
+
     let mut last_i = 0;
-    let max_iterations = 100000;
+    let max_iterations = 1000000;
     for i in 0..max_iterations
     {
         let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
@@ -123,8 +110,9 @@ pub fn run(path: &str)
         pin_num = best;
 
         let avg_brightness = error_sum as f32 / (img_size*img_size) as f32;
-        if avg_brightness < 10.0
+        if avg_brightness < brightness_threshold
         {
+            println!("{}", i);
             break;
         }
 
@@ -135,7 +123,7 @@ pub fn run(path: &str)
             let iters = i - last_i;
             let time_per_iter = elapsed.as_secs_f32() / iters as f32;
 
-            let remaining_iters_est = ((avg_brightness - 10.0).max(0.01) / REMOVE as f32) * 2.5 * (img_size as f32);
+            let remaining_iters_est = ((avg_brightness - brightness_threshold).max(0.01) / REMOVE as f32) * 2.5 * (img_size as f32);
             let progress = i as f32 / (i as f32 + remaining_iters_est as f32);
 
             let remaining_secs = remaining_iters_est * time_per_iter;
@@ -161,7 +149,7 @@ pub fn run(path: &str)
         }
     }
     println!("\nOne Moment");
-    output_img.save("tests/result03.png").unwrap();
+    output_img.save("tests/result04.png").unwrap();
 
     std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
