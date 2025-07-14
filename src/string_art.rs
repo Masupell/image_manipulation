@@ -29,14 +29,24 @@ pub fn run(path: &str)
 
     input_img = input_img.crop_imm(0, 0, img_size, img_size); // Not Perfect, but fine
 
-    let mut pixel_value: Vec<Vec<i16>> = vec![vec![0; input_img.width() as usize]; input_img.height() as usize];
-    pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading, just saving the image pixels to this array
+    let mut pixel_value: Vec<i16> = vec![0; (img_size * img_size) as usize];
+    for y in 0..img_size
     {
-        row.par_iter_mut().enumerate().for_each(|(x, val)| 
+        for x in 0..img_size
         {
-            *val = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
-        });
-    });
+            let i = (y * img_size + x) as usize;
+            pixel_value[i] = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
+        }
+    }
+
+    // let mut pixel_value: Vec<Vec<i16>> = vec![vec![0; input_img.width() as usize]; input_img.height() as usize];
+    // pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading, just saving the image pixels to this array
+    // {
+    //     row.par_iter_mut().enumerate().for_each(|(x, val)| 
+    //     {
+    //         *val = input_img.get_pixel(x as u32, y as u32).0[0] as i16;
+    //     });
+    // });
 
     let mut weight: Vec<Vec<f32>> = vec![vec![0.0; input_img.width() as usize]; input_img.height() as usize];
     for (x, y, pixel) in input_img.pixels()
@@ -80,8 +90,8 @@ pub fn run(path: &str)
         for y in 0..amount
         {
             if x == y { continue; }
-            let (x0, x1) = pins[x];
-            let (y0, y1) = pins[y];
+            let (x0, y0) = pins[x];
+            let (x1, y1) = pins[y];
             precomputed_lines[x][y] = get_anitaliased_line(x0 as f32, y0 as f32, x1 as f32, y1 as f32);
         }
     }
@@ -96,24 +106,30 @@ pub fn run(path: &str)
 
     for i in 0..6000
     {
-        let mut darkest = i32::MAX;
-        let mut best = 0;
-        for pin_number in 0..amount
-        {
-            if pin_number == pin_num { continue; }
+        // let mut darkest = i32::MAX;
+        // let mut best = 0;
+        // for pin_number in 0..amount
+        // {
+        //     if pin_number == pin_num { continue; }
             
-            let line = &precomputed_lines[pin_num][pin_number];
-            let score = penalty(&pixel_value, line); //Average Brightness of all pixels in line
+        //     let line = &precomputed_lines[pin_num][pin_number];
+        //     let score = penalty(&pixel_value, line, img_size); //Average Brightness of all pixels in line
 
-            if score < darkest
-            {
-                darkest = score;
-                best = pin_number;
-            }
-        }
+        //     if score < darkest
+        //     {
+        //         darkest = score;
+        //         best = pin_number;
+        //     }
+        // }
+        let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
+        {
+            let line = &precomputed_lines[pin_num][pin_number];
+            let score = penalty(&pixel_value, line, img_size); //Average Brightness of all pixels in line
+            (pin_number, score)
+        }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
 
         let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut pixel_value, best_line);
+        draw_line(&mut output_img, &mut pixel_value, best_line, img_size);
 
         pin_num = best;
 
@@ -205,22 +221,34 @@ fn get_anitaliased_line(x0: f32, y0: f32, x1: f32, y1: f32) -> Line // Returns a
 }
 
 
-fn penalty(arr: &Vec<Vec<i16>>, line: &[(u32, u32, f32)]) -> i32
+#[inline(always)]
+fn penalty(arr: &[i16], line: &[(u32, u32, f32)], size: u32) -> i32
 {
     let mut sum = 0.0;
     for &(x, y, alpha) in line 
     {
-        sum += (arr[y as usize][x as usize].abs() as f32) * alpha;
+        let i = (y * size + x) as usize;
+        sum += (arr[i].abs() as f32) * alpha;
     }
     (sum / line.len() as f32) as i32
 }
 
-fn draw_line(img: &mut RgbaImage, arr: &mut Vec<Vec<i16>>, line: &[(u32, u32, f32)])
+fn draw_line(img: &mut RgbaImage, arr: &mut [i16], line: &[(u32, u32, f32)], size: u32)
 {
     for &(x, y, alpha) in line 
     {
-        let blend = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
-        img.get_pixel_mut(x, y).blend(&blend);
-        arr[y as usize][x as usize] += (REMOVE as f32 * alpha) as i16;
+        let i = (y * size + x) as usize;
+
+        arr[i] += (REMOVE as f32 * alpha) as i16;
+
+        let px = img.get_pixel_mut(x, y);
+        for c in 0..3 
+        {
+            let base = px.0[c] as u16;
+            let blended = (base as f32 * (1.0 - alpha * (DRAW_OPACITY as f32 / 255.0))) as u8;
+            px.0[c] = blended;
+        }
+        // let blend = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
+        // img.get_pixel_mut(x, y).blend(&blend);
     }
 }
