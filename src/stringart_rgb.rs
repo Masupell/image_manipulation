@@ -110,17 +110,17 @@ pub fn run(path: &str)
         let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
         {
             let line = &precomputed_lines[pin_num][pin_number];
-            let score = penalty(&red, line, img_size); //Average Brightness of all pixels in line
+            let score = penalty(&red, line, img_size) + penalty(&green, line, img_size) + penalty(&blue, line, img_size); //Average Brightness of all pixels in line
             (pin_number, score)
         }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
 
         let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut red, best_line, img_size, &mut red_error_sum, 0);
+        draw_line(&mut output_img, &mut red, &mut green, &mut blue, best_line, img_size, &mut red_error_sum, &mut green_error_sum, &mut blue_error_sum);
 
         pin_num = best;
 
-        let avg_brightness = red_error_sum as f32 / (img_size*img_size) as f32;
-        if avg_brightness < brightness_threshold
+        let avg_brightness = (red_error_sum as f32 + green_error_sum as f32 + blue_error_sum as f32) / (img_size*img_size) as f32;
+        if avg_brightness < brightness_threshold*3.0
         {
             println!("{}", i);
             break;
@@ -158,150 +158,9 @@ pub fn run(path: &str)
             last_i = i;
         }
     }
-
-
-    //Green
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Starting Pin
-    let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
-    // let mut pin = pins[0];
-
-
-    let start_time = Instant::now();
-    let mut last_update = Instant::now();
-
-    let brightness_threshold = 10.0;
-
-    let mut last_i = 0;
-    let max_iterations = 1000000;
-    for i in 0..max_iterations
-    {
-        let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
-        {
-            let line = &precomputed_lines[pin_num][pin_number];
-            let score = penalty(&green, line, img_size); //Average Brightness of all pixels in line
-            (pin_number, score)
-        }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
-
-        let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut green, best_line, img_size, &mut green_error_sum, 1);
-
-        pin_num = best;
-
-        let avg_brightness = green_error_sum as f32 / (img_size*img_size) as f32;
-        if avg_brightness < brightness_threshold
-        {
-            println!("{}", i);
-            break;
-        }
-
-
-        if last_update.elapsed().as_secs() >= 1
-        {
-            let elapsed = last_update.elapsed();
-            let iters = i - last_i;
-            let time_per_iter = elapsed.as_secs_f32() / iters as f32;
-
-            let remaining_iters_est = ((avg_brightness - brightness_threshold).max(0.01) / REMOVE as f32) * 2.5 * (img_size as f32);
-            let progress = i as f32 / (i as f32 + remaining_iters_est as f32);
-
-            let remaining_secs = remaining_iters_est * time_per_iter;
-
-            let elapsed_total = start_time.elapsed();
-            let remaining = Duration::from_secs_f32(remaining_secs);
-    
-            let elapsed_minutes = elapsed_total.as_secs() / 60;
-            let elapsed_seconds = elapsed_total.as_secs() % 60;
-            let remaining_minutes = remaining.as_secs() / 60;
-            let remaining_seconds = remaining.as_secs() % 60;
-    
-            print!(
-                "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
-                progress * 100.0,
-                elapsed_minutes, elapsed_seconds,
-                remaining_minutes, remaining_seconds
-            );
-            std::io::stdout().flush().unwrap();
-
-            last_update = Instant::now();
-            last_i = i;
-        }
-    }
-
-
-    //Blue
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Starting Pin
-    let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
-    // let mut pin = pins[0];
-
-
-    let start_time = Instant::now();
-    let mut last_update = Instant::now();
-
-    let brightness_threshold = 10.0;
-
-    let mut last_i = 0;
-    let max_iterations = 1000000;
-    for i in 0..max_iterations
-    {
-        let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
-        {
-            let line = &precomputed_lines[pin_num][pin_number];
-            let score = penalty(&blue, line, img_size); //Average Brightness of all pixels in line
-            (pin_number, score)
-        }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
-
-        let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut blue, best_line, img_size, &mut blue_error_sum, 0);
-
-        pin_num = best;
-
-        let avg_brightness = blue_error_sum as f32 / (img_size*img_size) as f32;
-        if avg_brightness < brightness_threshold
-        {
-            println!("{}", i);
-            break;
-        }
-
-
-        if last_update.elapsed().as_secs() >= 1
-        {
-            let elapsed = last_update.elapsed();
-            let iters = i - last_i;
-            let time_per_iter = elapsed.as_secs_f32() / iters as f32;
-
-            let remaining_iters_est = ((avg_brightness - brightness_threshold).max(0.01) / REMOVE as f32) * 2.5 * (img_size as f32);
-            let progress = i as f32 / (i as f32 + remaining_iters_est as f32);
-
-            let remaining_secs = remaining_iters_est * time_per_iter;
-
-            let elapsed_total = start_time.elapsed();
-            let remaining = Duration::from_secs_f32(remaining_secs);
-    
-            let elapsed_minutes = elapsed_total.as_secs() / 60;
-            let elapsed_seconds = elapsed_total.as_secs() % 60;
-            let remaining_minutes = remaining.as_secs() / 60;
-            let remaining_seconds = remaining.as_secs() % 60;
-    
-            print!(
-                "\rProgress: {:.0}% | Elapsed: {:02}:{:02} | Remaining: {:02}:{:02}",
-                progress * 100.0,
-                elapsed_minutes, elapsed_seconds,
-                remaining_minutes, remaining_seconds
-            );
-            std::io::stdout().flush().unwrap();
-
-            last_update = Instant::now();
-            last_i = i;
-        }
-    }
-
-
-
 
     println!("\nOne Moment");
-    output_img.save("tests/result04.png").unwrap();
+    output_img.save("tests/result01.png").unwrap();
 
     std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
@@ -368,24 +227,51 @@ fn penalty(arr: &[i16], line: &[(u32, u32, f32)], size: u32) -> i32
     (sum / line.len() as f32) as i32
 }
 
-fn draw_line(img: &mut RgbaImage, arr: &mut [i16], line: &[(u32, u32, f32)], size: u32, error_sum: &mut i32, channel: usize)
+fn draw_line(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut [i16], line: &[(u32, u32, f32)], size: u32, 
+    red_error_sum: &mut i32, green_error_sum: &mut i32, blue_error_sum: &mut i32)
 {
     for &(x, y, alpha) in line 
     {
         let i = (y * size + x) as usize;
 
-        let remove_amount = (REMOVE as f32 * alpha) as i16;
-        arr[i] += remove_amount;
-        *error_sum -= remove_amount as i32;
+        // let remove_amount = (REMOVE as f32 * alpha) as i16;
+        // red[i] += remove_amount;
+        // *red_error_sum -= remove_amount as i32;
+        // green[i] += remove_amount;
+        // *green_error_sum -= remove_amount as i32;
+        // blue[i] += remove_amount;
+        // *blue_error_sum -= remove_amount as i32;
 
         let px = img.get_pixel_mut(x, y);
 
-        let base = px.0[channel] as f32;
-        let darkening = alpha ;//* draw_opacity_f;
-        let new_val = (base * (1.0 - darkening)).max(0.0) as u8;
+        let base_red = red[i].max(0) as f32;
+        let base_green = green[i].max(0) as f32;
+        let base_blue = blue[i].max(0) as f32;
 
-        px.0[channel] = new_val;
-        // let blend = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
-        // img.get_pixel_mut(x, y).blend(&blend);
+        let total = base_red + base_green + base_blue + 1.0; // prevent division by zero
+
+        let red_factor = base_red / total;
+        let green_factor = base_green / total;
+        let blue_factor = base_blue / total;
+
+        red[i] += (REMOVE as f32 * alpha * red_factor) as i16;
+        *red_error_sum -= (REMOVE as f32 * alpha * red_factor) as i32;
+
+        green[i] += (REMOVE as f32 * alpha * green_factor) as i16;
+        *green_error_sum -= (REMOVE as f32 * alpha * green_factor) as i32;
+        
+        blue[i] += (REMOVE as f32 * alpha * blue_factor) as i16;
+        *blue_error_sum -= (REMOVE as f32 * alpha * blue_factor) as i32;
+
+        px.0[0] = blend_channel(px.0[0], alpha * red_factor);
+        px.0[1] = blend_channel(px.0[1], alpha * green_factor);
+        px.0[2] = blend_channel(px.0[2], alpha * blue_factor);
     }
+}
+
+
+fn blend_channel(base: u8, alpha: f32) -> u8
+{
+    let darkening = alpha * (DRAW_OPACITY as f32/255.0);
+    (base as f32 * (1.0 - darkening)).max(0.0) as u8
 }
