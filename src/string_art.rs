@@ -1,124 +1,23 @@
-use std::f32::consts::PI;
-use std::io;
-use std::io::Write;
 use rand::Rng;
+use std::f32::consts::PI;
+use std::i32;
+use std::io::Write;
 use std::time::{Duration, Instant};
 
-use image::{GenericImage, Pixel, Rgb, Rgba, RgbaImage};
+use image::{Pixel, Rgba, RgbaImage};
 use image::GenericImageView;
-
 use rayon::prelude::*;
 
-pub static LOOPS: i32 = 6000; //6000
+type Line = Vec<(u32, u32, f32)>; //x, y, blend_alpha
+
 pub static DRAW_OPACITY: u8 = 130; //130
-pub static REMOVE: i16 = 130; //50
+pub static REMOVE: i16 = 50; //50
 
-pub const PATH: &str = "peppe_sad.png";
-
-fn draw_line_2(img: &mut RgbaImage, x0: i64, y0: i64, x1: i64, y1: i64, arr: &mut Vec<Vec<i16>>, _weight: &mut Vec<Vec<f32>>) {
-    let x0 = x0 as f32;
-    let y0 = y0 as f32;
-    let x1 = x1 as f32;
-    let y1 = y1 as f32;
-
-    let steep = (y1 - y0).abs() > (x1 - x0).abs();
-
-    let (x0, y0, x1, y1) = if steep 
-    {
-        (y0, x0, y1, x1)
-    } 
-    else 
-    {
-        (x0, y0, x1, y1)
-    };
-
-    let (x0, y0, x1, y1) = if x0 > x1 
-    {
-        (x1, y1, x0, y0)
-    } 
-    else 
-    {
-        (x0, y0, x1, y1)
-    };
-
-    let dx = x1 - x0;
-    let dy = y1 - y0;
-    let gradient = if dx == 0.0 { 1.0 } else { dy / dx };
-
-    let mut x = x0.round();
-    let mut y = y0 + (x - x0) * gradient;
-
-    while x <= x1 
-    {
-        let base_x = x as i32;
-        let base_y = y.floor() as i32;
-        let weight = y.fract();
-
-        let mut draw = |ix: i32, iy: i32, alpha: f32| 
-        {
-            if ix >= 0 && iy >= 0 && (ix as u32) < img.width() && (iy as u32) < img.height() 
-            {
-                let color = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
-                img.get_pixel_mut(ix as u32, iy as u32).blend(&color);
-                arr[iy as usize][ix as usize] += (REMOVE as f32 * alpha) as i16;
-            }
-        };
-
-        if steep 
-        {
-            draw(base_y, base_x, 1.0 - weight);
-            draw(base_y + 1, base_x, weight);
-        } 
-        else 
-        {
-            draw(base_x, base_y, 1.0 - weight);
-            draw(base_x, base_y + 1, weight);
-        }
-
-        x += 1.0;
-        y += gradient;
-    }
-}
-
-fn penalty(x0: i64, y0: i64, x1: i64, y1: i64, arr: &Vec<Vec<i16>>, weight: &Vec<Vec<f32>>) -> i32
-{
-    let mut sum_brightness = 0;
-    let mut num_pixels = 0;
-    
-    let mut x0 = x0;
-    let mut y0 = y0;
-
-    let dx = if x0 > x1 { x0 - x1 } else { x1 - x0 };
-    let dy = if y0 > y1 { y0 - y1 } else { y1 - y0 };
-
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-
-    let mut err = if dx > dy { dx } else {-dy} / 2;
-    let mut err2;
-
-    loop 
-    {
-        let pixel_value = arr[y0 as usize][x0 as usize];
-        sum_brightness += (pixel_value as i32).abs();
-        num_pixels += 1;
-
-        if x0 == x1 && y0 == y1 { break };
-
-        err2 = 2 * err;
-
-        if err2 > -dx { err -= dy; x0 += sx; }
-        if err2 < dy { err += dx; y0 += sy; }
-    }
-
-    (sum_brightness - (REMOVE as i32 * num_pixels)) / num_pixels
-}
-
-pub fn run() 
+pub fn run(path: &str)
 {
     let beginning = Instant::now();
     println!("Preparing Image...");
-    let mut input_img = image::open("tests/".to_string() + PATH).unwrap();
+    let mut input_img = image::open(path).unwrap();
 
     let width = input_img.width() as f32;
     let height = input_img.height() as f32;
@@ -127,24 +26,11 @@ pub fn run()
     let img_size = radius as u32 * 2;
 
     input_img = input_img.grayscale();
-    // for y in 0..input_img.height()
-    // {
-    //     for x in 0..input_img.width()
-    //     {
-    //         let color = input_img.get_pixel(x, y);
-    //         input_img.put_pixel(x, y, Rgba([0, color.0[1], 0, 255]));
-    //     }
-    // }
-    // input_img.save("res/test.png").unwrap();
 
-    input_img = input_img.crop_imm(0, 0, img_size, img_size);
+    input_img = input_img.crop_imm(0, 0, img_size, img_size); // Not Perfect, but fine
 
     let mut pixel_value: Vec<Vec<i16>> = vec![vec![0; input_img.width() as usize]; input_img.height() as usize];
-    // for (x, y, pixel) in input_img.pixels()
-    // {
-    //     pixel_value[y as usize][x as usize] = pixel.0[0] as i16;
-    // }
-    pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading
+    pixel_value.par_iter_mut().enumerate().for_each(|(y, row)| //Faster with threading, just saving the image pixels to this array
     {
         row.par_iter_mut().enumerate().for_each(|(x, val)| 
         {
@@ -158,8 +44,8 @@ pub fn run()
         weight[y as usize][x as usize] = (1.0 - ((pixel.0[0] as f32)/255.0)).abs();
     }
 
+    // Pins
     let mut pins: Vec<(u32, u32)> = Vec::new();
-
 
     let center = radius;
 
@@ -174,9 +60,8 @@ pub fn run()
 
         pins.push((x, y));
     }
-    
-    let amount = pins.len();
 
+    //Output Image + Make Background White
     let mut output_img = RgbaImage::new(img_size, img_size);
 
     for y in 0..output_img.height()
@@ -186,45 +71,58 @@ pub fn run()
             output_img.put_pixel(x, y, Rgba([200, 200, 200, 255]));
         }
     }
-    // output_img.enumerate_pixels_mut().par_bridge().for_each(|(_, _, pixel)| 
-    // {
-    //     *pixel = Rgba([200, 200, 200, 255]);
-    // });
 
+
+    //Precompute lines (to not calculate lines during loop, faster)
+    let mut precomputed_lines: Vec<Vec<Line>> = vec![vec![Vec::new(); amount]; amount];
+    for x in 0..amount
+    {
+        for y in 0..amount
+        {
+            if x == y { continue; }
+            let (x0, x1) = pins[x];
+            let (y0, y1) = pins[y];
+            precomputed_lines[x][y] = get_anitaliased_line(x0 as f32, y0 as f32, x1 as f32, y1 as f32);
+        }
+    }
+
+    // Starting Pin
     let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
-    let mut pin = pins[0];
-
+    // let mut pin = pins[0];
 
 
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
-    for i in 0..LOOPS
+    for i in 0..6000
     {
-        let pin_nums: Vec<usize> = (0..amount).filter(|&pin| pin != pin_num).collect();
-
         let mut darkest = i32::MAX;
-        let mut num = 0;
-        for i in 0..pin_nums.len()
+        let mut best = 0;
+        for pin_number in 0..amount
         {
-            let current_pin = pins[pin_nums[i]];
-            let brightness = penalty(pin.0 as i64, pin.1 as i64, current_pin.0 as i64, current_pin.1 as i64, &pixel_value, &weight);
-            if brightness < darkest
+            if pin_number == pin_num { continue; }
+            
+            let line = &precomputed_lines[pin_num][pin_number];
+            let score = penalty(&pixel_value, line); //Average Brightness of all pixels in line
+
+            if score < darkest
             {
-                darkest = brightness;
-                num = i;
+                darkest = score;
+                best = pin_number;
             }
         }
 
-        let current_pin = pins[pin_nums[num]];
-        draw_line_2(&mut output_img, pin.0 as i64, pin.1 as i64, current_pin.0 as i64, current_pin.1 as i64, &mut pixel_value, &mut weight);
-        pin_num = num;
-        pin = current_pin;
+        let best_line = &precomputed_lines[pin_num][best];
+        draw_line(&mut output_img, &mut pixel_value, best_line);
+
+        pin_num = best;
+
+
 
 
         if last_update.elapsed().as_secs() >= 1
         {
-            let progress = i as f32 / LOOPS as f32;
+            let progress = i as f32 / 6000 as f32;
             let elapsed = start_time.elapsed();
             let remaining = if progress > 0.0
             {
@@ -246,14 +144,83 @@ pub fn run()
                 elapsed_minutes, elapsed_seconds,
                 remaining_minutes, remaining_seconds
             );
-            io::stdout().flush().unwrap();
+            std::io::stdout().flush().unwrap();
 
             last_update = Instant::now();
         }
     }
-    print!("\nOne Moment...");
-    output_img.save("tests/result01.png").unwrap();
-    io::stdout().flush().unwrap();
-    println!("\rDone         ");
+
+    output_img.save("tests/result02.png").unwrap();
+
+    std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
+}
+
+
+fn get_anitaliased_line(x0: f32, y0: f32, x1: f32, y1: f32) -> Line // Returns a Line of antialiased calculation (just position and alpha value)
+{
+    let mut result = Vec::new();
+    
+    let steep = (y1 - y0).abs() > (x1 - x0).abs();
+    let (x0, y0, x1, y1) = if steep { (y0, x0, y1, x1) } else { (x0, y0, x1, y1) };
+    let (x0, y0, x1, y1) = if x0 > x1 { (x1, y1, x0, y0) } else { (x0, y0, x1, y1) };
+
+    let dx = x1 - x0;
+    let dy = y1 - y0;
+    let gradient = if dx == 0.0 { 1.0 } else { dy / dx };
+
+    let mut x = x0.round();
+    let mut y = y0 + (x - x0) * gradient;
+
+    while x <= x1 
+    {
+        let base_x = x as i32;
+        let base_y = y.floor() as i32;
+        let weight = y.fract();
+
+        let mut push = |ix: i32, iy: i32, alpha: f32| 
+        {
+            if ix >= 0 && iy >= 0 
+            {
+                result.push((ix as u32, iy as u32, alpha));
+            }
+        };
+
+        if steep 
+        {
+            push(base_y, base_x, 1.0 - weight);
+            push(base_y + 1, base_x, weight);
+        } 
+        else 
+        {
+            push(base_x, base_y, 1.0 - weight);
+            push(base_x, base_y + 1, weight);
+        }
+
+        x += 1.0;
+        y += gradient;
+    }
+
+    result
+}
+
+
+fn penalty(arr: &Vec<Vec<i16>>, line: &[(u32, u32, f32)]) -> i32
+{
+    let mut sum = 0.0;
+    for &(x, y, alpha) in line 
+    {
+        sum += (arr[y as usize][x as usize].abs() as f32) * alpha;
+    }
+    (sum / line.len() as f32) as i32
+}
+
+fn draw_line(img: &mut RgbaImage, arr: &mut Vec<Vec<i16>>, line: &[(u32, u32, f32)])
+{
+    for &(x, y, alpha) in line 
+    {
+        let blend = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
+        img.get_pixel_mut(x, y).blend(&blend);
+        arr[y as usize][x as usize] += (REMOVE as f32 * alpha) as i16;
+    }
 }

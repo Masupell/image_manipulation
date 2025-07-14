@@ -23,7 +23,7 @@ fn main()
             }
             else if test[0] == '2'
             {
-                string_art::run();
+                string_art::run("/home/marcel/Documents/programming/image_manipulation/tests/peppe_sad.png");
                 return;
             }
             else 
