@@ -244,9 +244,12 @@ fn draw_line(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut
 
         let px = img.get_pixel_mut(x, y);
 
-        let base_red = red[i].max(0) as f32;
-        let base_green = green[i].max(0) as f32;
-        let base_blue = blue[i].max(0) as f32;
+        // let base_red = red[i].max(0) as f32;
+        // let base_green = green[i].max(0) as f32;
+        // let base_blue = blue[i].max(0) as f32;
+        let base_red = (255 - red[i].clamp(0, 255)) as f32;
+        let base_green = (255 - green[i].clamp(0, 255)) as f32;
+        let base_blue = (255 - blue[i].clamp(0, 255)) as f32;
 
         let total = base_red + base_green + base_blue + 1.0; // prevent division by zero
 
