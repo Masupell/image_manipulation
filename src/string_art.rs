@@ -106,24 +106,11 @@ pub fn run(path: &str)
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
-    for i in 0..100000
+    let mut last_i = 0;
+    let max_iterations = 100000;
+    for i in 0..max_iterations
     {
-        // let mut darkest = i32::MAX;
-        // let mut best = 0;
-        // for pin_number in 0..amount
-        // {
-        //     if pin_number == pin_num { continue; }
-            
-        //     let line = &precomputed_lines[pin_num][pin_number];
-        //     let score = penalty(&pixel_value, line, img_size); //Average Brightness of all pixels in line
-
-        //     if score < darkest
-        //     {
-        //         darkest = score;
-        //         best = pin_number;
-        //     }
-        // }
-        let (best, brightness) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
+        let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
         {
             let line = &precomputed_lines[pin_num][pin_number];
             let score = penalty(&pixel_value, line, img_size); //Average Brightness of all pixels in line
@@ -144,19 +131,20 @@ pub fn run(path: &str)
 
         if last_update.elapsed().as_secs() >= 1
         {
-            let progress = i as f32 / 100000 as f32;
-            let elapsed = start_time.elapsed();
-            let remaining = if progress > 0.0
-            {
-                Duration::from_secs_f32(elapsed.as_secs_f32() * (1.0 - progress) / progress)
-            }
-            else
-            {
-                Duration::ZERO
-            };
+            let elapsed = last_update.elapsed();
+            let iters = i - last_i;
+            let time_per_iter = elapsed.as_secs_f32() / iters as f32;
+
+            let remaining_iters_est = ((avg_brightness - 10.0).max(0.01) / REMOVE as f32) * 2.5 * (img_size as f32);
+            let progress = i as f32 / (i as f32 + remaining_iters_est as f32);
+
+            let remaining_secs = remaining_iters_est * time_per_iter;
+
+            let elapsed_total = start_time.elapsed();
+            let remaining = Duration::from_secs_f32(remaining_secs);
     
-            let elapsed_minutes = elapsed.as_secs() / 60;
-            let elapsed_seconds = elapsed.as_secs() % 60;
+            let elapsed_minutes = elapsed_total.as_secs() / 60;
+            let elapsed_seconds = elapsed_total.as_secs() % 60;
             let remaining_minutes = remaining.as_secs() / 60;
             let remaining_seconds = remaining.as_secs() % 60;
     
@@ -169,9 +157,10 @@ pub fn run(path: &str)
             std::io::stdout().flush().unwrap();
 
             last_update = Instant::now();
+            last_i = i;
         }
     }
-
+    println!("\nOne Moment");
     output_img.save("tests/result03.png").unwrap();
 
     std::io::stdout().flush().unwrap();
