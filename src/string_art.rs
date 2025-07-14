@@ -54,6 +54,8 @@ pub fn run(path: &str)
         weight[y as usize][x as usize] = (1.0 - ((pixel.0[0] as f32)/255.0)).abs();
     }
 
+    let mut error_sum: i32 = pixel_value.iter().map(|&v| v as i32).sum();
+
     // Pins
     let mut pins: Vec<(u32, u32)> = Vec::new();
 
@@ -104,7 +106,7 @@ pub fn run(path: &str)
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
-    for i in 0..6000
+    for i in 0..100000
     {
         // let mut darkest = i32::MAX;
         // let mut best = 0;
@@ -121,7 +123,7 @@ pub fn run(path: &str)
         //         best = pin_number;
         //     }
         // }
-        let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
+        let (best, brightness) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
         {
             let line = &precomputed_lines[pin_num][pin_number];
             let score = penalty(&pixel_value, line, img_size); //Average Brightness of all pixels in line
@@ -129,16 +131,20 @@ pub fn run(path: &str)
         }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
 
         let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut pixel_value, best_line, img_size);
+        draw_line(&mut output_img, &mut pixel_value, best_line, img_size, &mut error_sum);
 
         pin_num = best;
 
-
+        let avg_brightness = error_sum as f32 / (img_size*img_size) as f32;
+        if avg_brightness < 10.0
+        {
+            break;
+        }
 
 
         if last_update.elapsed().as_secs() >= 1
         {
-            let progress = i as f32 / 6000 as f32;
+            let progress = i as f32 / 100000 as f32;
             let elapsed = start_time.elapsed();
             let remaining = if progress > 0.0
             {
@@ -166,7 +172,7 @@ pub fn run(path: &str)
         }
     }
 
-    output_img.save("tests/result02.png").unwrap();
+    output_img.save("tests/result03.png").unwrap();
 
     std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
@@ -233,13 +239,15 @@ fn penalty(arr: &[i16], line: &[(u32, u32, f32)], size: u32) -> i32
     (sum / line.len() as f32) as i32
 }
 
-fn draw_line(img: &mut RgbaImage, arr: &mut [i16], line: &[(u32, u32, f32)], size: u32)
+fn draw_line(img: &mut RgbaImage, arr: &mut [i16], line: &[(u32, u32, f32)], size: u32, error_sum: &mut i32)
 {
     for &(x, y, alpha) in line 
     {
         let i = (y * size + x) as usize;
 
-        arr[i] += (REMOVE as f32 * alpha) as i16;
+        let remove_amount = (REMOVE as f32 * alpha) as i16;
+        arr[i] += remove_amount;
+        *error_sum -= remove_amount as i32;
 
         let px = img.get_pixel_mut(x, y);
         for c in 0..3 
