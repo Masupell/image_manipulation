@@ -13,7 +13,7 @@ type Line = Vec<(u32, u32, f32)>; //x, y, blend_alpha
 pub static DRAW_OPACITY: u8 = 100; //130
 pub static REMOVE: i16 = 100; //50
 
-pub fn run(path: &str)
+pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
 {
     let beginning = Instant::now();
     println!("Preparing Image...");
@@ -101,8 +101,6 @@ pub fn run(path: &str)
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
-    let brightness_threshold = 10.0;
-
     let mut last_i = 0;
     let max_iterations = 1000000;
     for i in 0..max_iterations
@@ -115,7 +113,7 @@ pub fn run(path: &str)
         }).reduce_with(|a, b| if a.1 < b.1 { a } else { b }).unwrap();
 
         let best_line = &precomputed_lines[pin_num][best];
-        draw_line(&mut output_img, &mut red, &mut green, &mut blue, best_line, img_size, &mut red_error_sum, &mut green_error_sum, &mut blue_error_sum);
+        draw_line_average(&mut output_img, &mut red, &mut green, &mut blue, best_line, img_size, &mut red_error_sum, &mut green_error_sum, &mut blue_error_sum);
 
         pin_num = best;
 
@@ -160,7 +158,7 @@ pub fn run(path: &str)
     }
 
     println!("\nOne Moment");
-    output_img.save("tests/result01.png").unwrap();
+    output_img.save(output_path).unwrap();
 
     std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
@@ -273,8 +271,116 @@ fn draw_line(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut
 }
 
 
+fn draw_line_average(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut [i16], line: &[(u32, u32, f32)], size: u32, 
+    red_error_sum: &mut i32, green_error_sum: &mut i32, blue_error_sum: &mut i32)
+{
+    let mut total_red = 0.0;
+    let mut total_green = 0.0;
+    let mut total_blue = 0.0;
+    let mut total_weight = 0.0;
+
+    for &(x, y, alpha) in line 
+    {
+        let i = (y * size + x) as usize;
+
+        let weight = alpha;
+
+        total_red += (255 - red[i].clamp(0, 255)) as f32 * weight;
+        total_green += (255 - green[i].clamp(0, 255)) as f32 * weight;
+        total_blue += (255 - blue[i].clamp(0, 255)) as f32 * weight;
+
+        total_weight += weight;
+    }
+
+    if total_weight == 0.0 
+    {
+        total_weight += 0.1
+    }
+
+    let avg_red = total_red / total_weight;
+    let avg_green = total_green / total_weight;
+    let avg_blue = total_blue / total_weight;
+
+    let total = avg_red + avg_green + avg_blue + 1.0;
+
+    let red_factor = avg_red / total;
+    let green_factor = avg_green / total;
+    let blue_factor = avg_blue / total;
+
+    let red_inc = (REMOVE as f32 * red_factor) as i16;
+    let green_inc = (REMOVE as f32 * green_factor) as i16;
+    let blue_inc = (REMOVE as f32 * blue_factor) as i16;
+
+    let red_err = red_inc as i32;
+    let green_err = green_inc as i32;
+    let blue_err = blue_inc as i32;
+
+    for &(x, y, alpha) in line 
+    {
+        let i = (y * size + x) as usize;
+
+        red[i] += red_inc;
+        *red_error_sum -= red_err;
+
+        green[i] += green_inc;
+        *green_error_sum -= green_err;
+
+        blue[i] += blue_inc;
+        *blue_error_sum -= blue_err;
+
+        let px = img.get_pixel_mut(x, y);
+
+        px.0[0] = blend_channel(px.0[0], alpha * red_factor);
+        px.0[1] = blend_channel(px.0[1], alpha * green_factor);
+        px.0[2] = blend_channel(px.0[2], alpha * blue_factor);
+    }
+}
+
+
 fn blend_channel(base: u8, alpha: f32) -> u8
 {
     let darkening = alpha * (DRAW_OPACITY as f32/255.0);
     (base as f32 * (1.0 - darkening)).max(0.0) as u8
 }
+
+
+
+// fn draw_line_dark(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut [i16], line: &[(u32, u32, f32)], size: u32, 
+//     red_error_sum: &mut i32, green_error_sum: &mut i32, blue_error_sum: &mut i32)
+// {
+//     for &(x, y, alpha) in line 
+//     {
+//         let i = (y * size + x) as usize;
+
+//         let px = img.get_pixel_mut(x, y);
+
+//         let base_red = (255 - red[i].clamp(0, 255)) as f32;
+//         let base_green = (255 - green[i].clamp(0, 255)) as f32;
+//         let base_blue = (255 - blue[i].clamp(0, 255)) as f32;
+
+//         let total = base_red + base_green + base_blue + 1.0; // prevent division by zero
+
+//         let red_factor = base_red / total;
+//         let green_factor = base_green / total;
+//         let blue_factor = base_blue / total;
+
+//         red[i] += (REMOVE as f32 * alpha * red_factor) as i16;
+//         *red_error_sum -= (REMOVE as f32 * alpha * red_factor) as i32;
+
+//         green[i] += (REMOVE as f32 * alpha * green_factor) as i16;
+//         *green_error_sum -= (REMOVE as f32 * alpha * green_factor) as i32;
+        
+//         blue[i] += (REMOVE as f32 * alpha * blue_factor) as i16;
+//         *blue_error_sum -= (REMOVE as f32 * alpha * blue_factor) as i32;
+
+//         px.0[0] = blend_channel_dark(px.0[0], alpha * red_factor);
+//         px.0[1] = blend_channel_dark(px.0[1], alpha * green_factor);
+//         px.0[2] = blend_channel_dark(px.0[2], alpha * blue_factor);
+//     }
+// }
+
+// fn blend_channel_dark(base: u8, alpha: f32) -> u8 
+// {
+//     let brightening = alpha * (DRAW_OPACITY as f32 / 255.0);
+//     ((base as f32 * (1.0 - brightening)) + 255.0 * brightening).min(255.0) as u8
+// }
