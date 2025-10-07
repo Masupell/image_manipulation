@@ -24,7 +24,7 @@ fn main()
             else if test[0] == '2'
             {
                 // string_art::run("/home/marcel/Downloads/pexels-pixabay-47547.jpg");
-                stringart_rgb::run("tests/Fox.jpg", 10.0, "tests/stringart/result06.png");
+                stringart_rgb::run("tests/peppe_sad.png", 10.0, "tests/stringart/result08.png");
                 // stringart_rgb::run();
                 return;
             }
