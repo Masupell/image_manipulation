@@ -48,6 +48,38 @@ pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
     let mut green_error_sum: i32 = green.iter().map(|&v| v as i32).sum();
     let mut blue_error_sum: i32 = blue.iter().map(|&v| v as i32).sum();
 
+    let mut cyan: Vec<f32> = vec![0.0; (img_size * img_size) as usize];
+    let mut magenta: Vec<f32> = vec![0.0; (img_size * img_size) as usize];
+    let mut yellow: Vec<f32> = vec![0.0; (img_size * img_size) as usize];
+    let mut black: Vec<f32> = vec![0.0; (img_size * img_size) as usize];
+
+    for y in 0..img_size
+    {
+        for x in 0..img_size
+        {
+            let idx = (y * img_size + x) as usize;
+            let pixel = input_img.get_pixel(x as u32, y as u32);
+            let red = pixel[0] as f32 / 255.0;
+            let green = pixel[1] as f32 / 255.0;
+            let blue = pixel[2] as f32 / 255.0;
+            (cyan[idx], magenta[idx], yellow[idx], black[idx]) = rgb_to_cmyk(red, green, blue);
+        }
+    }
+
+    let mut output_img = RgbaImage::new(img_size, img_size);
+    for y in 0..img_size
+    {
+        for x in 0..img_size
+        {
+            let idx = (y * img_size + x) as usize;
+            let (r, g, b) = cmyk_to_rgb(cyan[idx], magenta[idx], yellow[idx], black[idx]);
+            output_img.put_pixel(x, y, Rgba([(r*255.0) as u8, (g*255.0) as u8, (b*255.0) as u8, 255]));
+        }
+    }
+
+    output_img.save(output_path).unwrap();
+    return;
+
     // Pins
     let mut pins: Vec<(u32, u32)> = Vec::new();
 
@@ -343,6 +375,32 @@ fn blend_channel(base: u8, alpha: f32) -> u8
     (base as f32 * (1.0 - darkening)).max(0.0) as u8
 }
 
+
+
+pub fn rgb_to_cmyk(r: f32, g: f32, b: f32) -> (f32, f32, f32, f32) // Cyan, magenta, yellow, key(black)
+{
+    let c = 1.0 - r;
+    let m = 1.0 - g;
+    let y = 1.0 - b;
+
+    let k = c.min(m).min(y);
+
+    if k >= 1.0 { return (0.0, 0.0, 0.0, 1.0); }
+
+    let c = (c - k) / (1.0 - k);
+    let m = (m - k) / (1.0 - k);
+    let y = (y - k) / (1.0 - k);
+
+    (c, m, y, k)
+}
+
+pub fn cmyk_to_rgb(c: f32, m: f32, y: f32, k: f32) -> (f32, f32, f32) 
+{
+    let r = (1.0 - c) * (1.0 - k);
+    let g = (1.0 - m) * (1.0 - k);
+    let b = (1.0 - y) * (1.0 - k);
+    (r, g, b)
+}
 
 
 // fn draw_line_dark(img: &mut RgbaImage, red: &mut [i16], green: &mut [i16], blue: &mut [i16], line: &[(u32, u32, f32)], size: u32, 
