@@ -46,14 +46,17 @@ pub fn run(path: &str, output: &str)
 
     let center = radius;
 
-    let amount = 360;
+    let amount = 200;
 
-    let angle = 360/amount;
+    let angle = 360.0/amount as f32;
 
-    for i in 0..360/angle
+    for i in 0..amount
     {
-        let x = (center + (radius - 10.0) * (i as f32 * angle as f32 * PI / 180.0).cos()).round() as u32;
-        let y = (center + (radius - 10.0) * (i as f32 * angle as f32 * PI / 180.0).sin()).round() as u32;
+        let a = i as f32 * angle * std::f32::consts::PI / 180.0;
+        let x = (center + (radius - 10.0) * a.cos()).round() as u32;
+        let y = (center + (radius - 10.0) * a.sin()).round() as u32;
+        // let x = (center + (radius - 10.0) * (i as f32 * angle as f32 * PI / 180.0).cos()).round() as u32;
+        // let y = (center + (radius - 10.0) * (i as f32 * angle as f32 * PI / 180.0).sin()).round() as u32;
 
         pins.push((x, y));
     }
@@ -68,6 +71,19 @@ pub fn run(path: &str, output: &str)
             output_img.put_pixel(x, y, Rgba([200, 200, 200, 255]));
         }
     }
+
+    for (x, y) in pins.iter()
+    {
+        for yy in [-1, 0, 1]
+        {
+            for xx in [-1, 0, 1]
+            {
+                output_img.put_pixel((*x as i32 + xx) as u32, (*y as i32 + yy) as u32, Rgba([255, 0, 0, 255]));
+            }
+        }
+    }
+
+    output_img.save("tests/stringart/result15.png").unwrap();
 
 
     //Precompute lines (to not calculate lines during loop, faster)
@@ -94,7 +110,7 @@ pub fn run(path: &str, output: &str)
     let brightness_threshold = 10.0;
 
     let mut last_i = 0;
-    let max_iterations = 1000000;
+    let max_iterations = 10000;//1000000;
     for i in 0..max_iterations
     {
         let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
@@ -112,7 +128,7 @@ pub fn run(path: &str, output: &str)
         let avg_brightness = error_sum as f32 / (img_size*img_size) as f32;
         if avg_brightness < brightness_threshold
         {
-            println!("{}", i);
+            println!("\nAmount of loops: {}", i);
             break;
         }
 

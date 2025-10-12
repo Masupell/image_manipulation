@@ -23,8 +23,8 @@ fn main()
             }
             else if test[0] == '2'
             {
-                // string_art::run("/home/marcel/Downloads/pexels-pixabay-47547.jpg", tests/result04.png);
-                stringart_rgb::run("tests/peppe_sad.png", "tests/stringart/result11.png");
+                string_art::run("tests/koala.webp", "tests/stringart/result14.png");
+                // stringart_rgb::run("tests/peppe_sad.png", "tests/stringart/result11.png");
                 // stringart_rgb::run();
                 return;
             }
