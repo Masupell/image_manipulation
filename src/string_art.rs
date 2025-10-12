@@ -64,13 +64,13 @@ pub fn run(path: &str, output: &str)
     //Output Image + Make Background White
     let mut output_img = RgbaImage::new(img_size, img_size);
 
-    for y in 0..output_img.height()
-    {
-        for x in 0..output_img.width()
-        {
-            output_img.put_pixel(x, y, Rgba([200, 200, 200, 255]));
-        }
-    }
+    // for y in 0..output_img.height()
+    // {
+    //     for x in 0..output_img.width()
+    //     {
+    //         output_img.put_pixel(x, y, Rgba([200, 200, 200, 255]));
+    //     }
+    // }
 
     for (x, y) in pins.iter()
     {
@@ -83,7 +83,7 @@ pub fn run(path: &str, output: &str)
         }
     }
 
-    output_img.save("tests/stringart/result15.png").unwrap();
+    // output_img.save("tests/stringart/result15.png").unwrap();
 
 
     //Precompute lines (to not calculate lines during loop, faster)
@@ -243,12 +243,20 @@ fn draw_line(img: &mut RgbaImage, arr: &mut [i16], line: &[(u32, u32, f32)], siz
         *error_sum -= remove_amount as i32;
 
         let px = img.get_pixel_mut(x, y);
-        for c in 0..3 
-        {
-            let base = px.0[c] as u16;
-            let blended = (base as f32 * (1.0 - alpha * (DRAW_OPACITY as f32 / 255.0))) as u8;
-            px.0[c] = blended;
-        }
+        let alpha = ((px.0[3] as f32 / 255.0) + alpha * (DRAW_OPACITY as f32 / 255.0)).clamp(0.0, 1.0);
+        // for c in 0..3 
+        // {
+        //     let base = px.0[c] as u16;
+        //     let blended = (base as f32 * (1.0 - alpha * (DRAW_OPACITY as f32 / 255.0))) as u8;
+        //     px.0[c] = blended;
+        // }
+        px.0 = 
+        [
+            (px.0[0] as f32 * (1.0 - alpha)) as u8,
+            (px.0[1] as f32 * (1.0 - alpha)) as u8,
+            (px.0[2] as f32 * (1.0 - alpha)) as u8,
+            (alpha * 255.0) as u8,
+        ];
         // let blend = Rgba([0, 0, 0, (DRAW_OPACITY as f32 * alpha) as u8]);
         // img.get_pixel_mut(x, y).blend(&blend);
     }

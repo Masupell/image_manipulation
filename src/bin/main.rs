@@ -23,7 +23,7 @@ fn main()
             }
             else if test[0] == '2'
             {
-                string_art::run("tests/koala.webp", "tests/stringart/result14.png");
+                string_art::run("tests/koala.webp", "tests/stringart/result16.png");
                 // stringart_rgb::run("tests/peppe_sad.png", "tests/stringart/result11.png");
                 // stringart_rgb::run();
                 return;
