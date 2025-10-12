@@ -13,7 +13,7 @@ type Line = Vec<(u32, u32, f32)>; //x, y, blend_alpha
 pub static DRAW_OPACITY: u8 = 100; //130
 pub static REMOVE: i16 = 100; //50
 
-pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
+pub fn run(path: &str, output_path: &str)
 {
     let beginning = Instant::now();
     println!("Preparing Image...");
@@ -94,21 +94,10 @@ pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
     let mut pin_num = rand::thread_rng().gen_range(0..pins.len());
     // let mut pin = pins[0];
 
-
-    let start_time = Instant::now();
-    let mut last_update = Instant::now();
-
-    let mut last_i = 0;
-
-    // let mut min_vals: [f32; 4] = [1.0; 4];
-    let mut max_vals: [f32; 4] = [0.0; 4];
-
     // let max_iterations = 1000000;
     for (i, a) in [&mut cyan, &mut magenta, &mut yellow, &mut black].iter_mut().enumerate()
     {
-        // let iterations = if i == 3 { 75000 } else { 25000 };
-        let strength = if i == 3 { 0.8 } else { 0.3 };
-        for _ in 0..25000
+        for _ in 0..10000
         {
             let (best, _) = (0..amount).into_par_iter().filter(|&pin_number| pin_number != pin_num).map(|pin_number| 
             {
@@ -122,12 +111,9 @@ pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
             for (x, y, alpha) in best_line.iter()
             {
                 let idx = (y * img_size + x) as usize;
-                let diff = a[idx] - canvas[idx][i]; 
-                let delta = diff * strength * alpha;
-                a[idx] = (a[idx] - delta).max(0.0); // 0.05 temporary, thats just testing I guess?
+                let delta = 0.2 * alpha;
+                a[idx] = (a[idx] - delta).max(0.0);
                 canvas[idx][i] = (canvas[idx][i] + delta).min(1.0);
-                // min_vals[i] = min_vals[i].min(delta);
-                max_vals[i] = max_vals[i].max(delta);
             }
 
             pin_num = best;
@@ -135,15 +121,6 @@ pub fn run(path: &str, brightness_threshold: f32, output_path: &str)
         println!("{}. Loop finished (Off four)", i+1);
     }
     println!("\nOne Moment");
-
-    // for [c, m, y, k] in &mut canvas 
-    // {
-    //     *c /= max_vals[0].max(1e-6);
-    //     *m /= max_vals[1].max(1e-6);
-    //     *y /= max_vals[2].max(1e-6);
-    //     *k /= max_vals[3].max(1e-6);
-    // }
-
 
 
     for y in 0..img_size

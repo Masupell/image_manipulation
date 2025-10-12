@@ -13,7 +13,7 @@ type Line = Vec<(u32, u32, f32)>; //x, y, blend_alpha
 pub static DRAW_OPACITY: u8 = 130; //130
 pub static REMOVE: i16 = 50; //50
 
-pub fn run(path: &str)
+pub fn run(path: &str, output: &str)
 {
     let beginning = Instant::now();
     println!("Preparing Image...");
@@ -149,7 +149,7 @@ pub fn run(path: &str)
         }
     }
     println!("\nOne Moment");
-    output_img.save("tests/result04.png").unwrap();
+    output_img.save(output).unwrap();
 
     std::io::stdout().flush().unwrap();
     println!("Total Time: {:02}:{:02}", beginning.elapsed().as_secs() / 60, beginning.elapsed().as_secs() % 60);
